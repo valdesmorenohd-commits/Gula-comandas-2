@@ -1,0 +1,98 @@
+// Gula Comandas 2.0 — BORRADOR DE LECTURA SEGURA PARA EMULADOR
+// NO DESPLEGADO. NO USAR COMO REGLAS ACTIVAS DE PRODUCCIÓN.
+// La versión firebase/firestore.rules se mantiene deny-all.
+// Solo documentos de una empresa con membresía válida, sin escrituras del navegador.
+// La membresía se establece exclusivamente desde un contexto administrativo confiable.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function membershipPath(businessId) {
+      return /databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid);
+    }
+    function validMember(businessId) {
+      return signedIn()
+        && exists(membershipPath(businessId))
+        && get(membershipPath(businessId)).data.get('uid', '') == request.auth.uid
+        && get(membershipPath(businessId)).data.get('businessId', '') == businessId
+        && get(membershipPath(businessId)).data.get('active', false) == true
+        && get(membershipPath(businessId)).data.get('roleId', '') in ['principal_admin', 'personal', 'consulta'];
+    }
+    function canUse(businessId, roles) {
+      return validMember(businessId)
+        && get(membershipPath(businessId)).data.roleId in roles;
+    }
+    // Las membresías no pueden autocrearse ni editarse desde el cliente.
+    // Un usuario lee solo su propia ficha, un administrador puede consultar otras.
+    match /businesses/{businessId} {
+      allow read, write: if false;
+
+      match /members/{uid} {
+        allow get: if signedIn()
+          && (uid == request.auth.uid || canUse(businessId, ['principal_admin']))
+          && validMember(businessId);
+        allow list: if false;
+        allow create, update, delete: if false;
+      }
+      match /roles/{roleId} {
+        allow get, list: if canUse(businessId, ['principal_admin']);
+        allow create, update, delete: if false;
+      }
+      match /products/{productId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal', 'consulta']);
+        allow create, update, delete: if false;
+      }
+      match /inventory/{productId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal']);
+        allow create, update, delete: if false;
+      }
+      match /clients/{clientId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal']);
+        allow create, update, delete: if false;
+      }
+      match /orders/{orderId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal', 'consulta']);
+        allow create, update, delete: if false;
+        match /payments/{paymentId} {
+          allow get, list: if canUse(businessId, ['principal_admin', 'personal', 'consulta']);
+          allow create, update, delete: if false;
+        }
+        match /refunds/{refundId} {
+          allow get, list: if canUse(businessId, ['principal_admin', 'personal', 'consulta']);
+          allow create, update, delete: if false;
+        }
+      }
+      match /cashEvents/{eventId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal', 'consulta']);
+        allow create, update, delete: if false;
+      }
+      match /cashClosures/{dateId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal', 'consulta']);
+        allow create, update, delete: if false;
+      }
+      match /reportTemplates/{templateId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal', 'consulta']);
+        allow create, update, delete: if false;
+      }
+      match /settings/{settingId} {
+        allow get: if canUse(businessId, ['principal_admin']);
+        allow list: if false;
+        allow create, update, delete: if false;
+      }
+      match /inventoryEvents/{eventId} {
+        allow get, list: if canUse(businessId, ['principal_admin', 'personal']);
+        allow create, update, delete: if false;
+      }
+      match /audit/{eventId} {
+        allow get, list: if canUse(businessId, ['principal_admin']);
+        allow create, update, delete: if false;
+      }
+    }
+    // Cualquier colección no enumerada permanece cerrada.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
