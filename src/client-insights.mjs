@@ -55,3 +55,27 @@ export function eligibleBirthdayEmail(client,todayISO){
   && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(client.email||'')
   && birthdayInDays(client.birthday,todayISO)===0;
 }
+
+/**
+ * Ventana simétrica alrededor del cumpleaños, basada en fecha de VENTA local.
+ * signedDays: negativo = cumpleaños ya pasó, positivo = se aproxima.
+ * El 29 de febrero se recuerda el 28 en años no bisiestos.
+ */
+export function birthdayWindowOffset(birthday,todayISO,range=2){
+ if(!validBirthday(birthday)||!/^\d{4}-\d{2}-\d{2}$/.test(todayISO||'')||!Number.isInteger(range)||range<0||range>7)return null;
+ const today=new Date(todayISO+'T12:00:00Z');
+ if(Number.isNaN(today.getTime())||today.toISOString().slice(0,10)!==todayISO)return null;
+ const [,month,day]=birthday.match(/^\d{4}-(\d{2})-(\d{2})$/).map(Number);
+ let match=null;
+ for(let year=today.getUTCFullYear()-1;year<=today.getUTCFullYear()+1;year++){
+  const leapDayFallback=month===2&&day===29&&new Date(Date.UTC(year,1,29)).getUTCMonth()!==1;
+  const date=new Date(Date.UTC(year,month-1,leapDayFallback?28:day,12));
+  const days=Math.round((date.getTime()-today.getTime())/86400000);
+  if(Math.abs(days)<=range&&(match===null||Math.abs(days)<Math.abs(match)))match=days;
+ }
+ return match;
+}
+export function birthdayWindowClients(clients,todayISO,range=2){
+ return clients.map(c=>({...c,birthdayOffset:birthdayWindowOffset(c.birthday,todayISO,range)}))
+ .filter(c=>c.birthdayOffset!==null).sort((a,b)=>Math.abs(a.birthdayOffset)-Math.abs(b.birthdayOffset)||a.name.localeCompare(b.name,'es'));
+}
