@@ -108,3 +108,12 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - La selección se conserva al cambiar la vista, la categoría o la búsqueda. Al editar una comanda se cargan las cantidades existentes; cancelar la edición limpia la selección.
 - Limitación actual: **una opción por producto** en cada comanda. Faltan líneas independientes para combinaciones del mismo producto con opciones distintas, y pruebas visuales en Safari iPhone/Android.
 - Sigue siendo una demo local. Stock y saldo deben verificarse transaccionalmente en el futuro backend antes del uso real.
+
+## Nueva comanda — navegación visual por categorías (demo local)
+- La pantalla de Nueva comanda ahora empieza mostrando **tarjetas de categoría con imagen**, cantidad de productos y nombre.
+- Al tocar una categoría, la tarjeta se sustituye por el catálogo de productos de esa categoría (fotografías predeterminadas y listado alternativo). Al tocar un producto sigue apareciendo la ventana emergente con +/−, opciones y subtotal.
+- «Volver a categorías» regresa al selector sin borrar las cantidades previamente seleccionadas; el resumen y total reúnen todas las categorías.
+- En Productos → Administrar categorías → **Imagen** se puede asignar una portada representativa mediante archivo JPG/PNG/WEBP. Se procesa y guarda localmente. Si no hay portada, se muestra una composición de fotos disponibles de los productos de esa categoría o «Sin fotografía referencial».
+- Las categorías que no tengan productos se muestran también; los productos sin categoría permanecen en la tarjeta «Sin categoría».
+- El respaldo JSON manual incluye ahora las categorías y fotografías de portada, tanto al exportar como al restaurar.
+- Sigue sin existir sincronización Firebase ni fotos compartidas entre dispositivos. No se han agregado categorías automáticas «Dulces» o «Salados».
