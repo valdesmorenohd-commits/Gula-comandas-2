@@ -6,7 +6,8 @@
 
 - Se incorpora fecha de nacimiento opcional. Para recordar cumpleaños se usa el día y mes; el año se conserva en esta demo porque el campo del navegador lo solicita, pero un diseño de producción debería permitir registrar solo día y mes para minimizar datos.
 - Se agrega autorización explícita para recibir un **saludo por correo el día del cumpleaños**. Por defecto está desmarcada, y se puede retirar editando la ficha. Marcarla en la app no prueba por sí solo que el cliente dio su consentimiento, por lo que la versión de producción deberá registrar cuándo, cómo y con qué información se obtuvo ese permiso.
-- Un aviso en Clientes muestra cumpleaños que se aproximan en 14 días, incluso sin consentimiento de correo (solo para gestión interna). El 29 de febrero se recuerda el 28 en años no bisiestos, decisión revisable.
+- Una alerta interna de cumpleaños aparece al seleccionar una ficha de cliente existente en **Nueva comanda**. El cálculo usa el día de registro de la venta (fecha local de Santiago), **no** la fecha de entrega programada. Por defecto avisa desde **2 días antes hasta 2 días después**, inclusive.
+- En **Clientes → Cumpleaños cercanos** se muestran los clientes dentro de ese mismo rango, incluidos los cumpleaños que acaban de pasar. El rango se puede ajustar a solo el día, ±1, ±2, ±3 o ±7 días. Se guarda como preferencia local por UID y navegador, independiente del permiso para enviar correos. El 29 de febrero se recuerda el 28 en años no bisiestos.
 - La vista del cliente indica fecha y estado de autorización. No se envían mensajes al guardar la ficha.
 
 ## Informe de compras por cliente
@@ -19,7 +20,7 @@
 
 ## Envío automático: diseño pendiente
 
-**No está activado**. Para que el correo se envíe aunque el iPhone esté apagado, hará falta un proceso programado en un backend con acceso autorizado y servicio de correo (por ejemplo, Google Apps Script con cuenta corporativa o un proveedor transaccional, sujeto a cuotas, políticas y costos que habrá que revisar antes de adoptar).
+**Aplazado expresamente para una fase posterior, sin fecha de activación.** Para que el correo se envíe aunque el iPhone esté apagado, hará falta un proceso programado en un backend con acceso autorizado y servicio de correo (por ejemplo, Google Apps Script con cuenta corporativa o un proveedor transaccional, sujeto a cuotas, políticas y costos que habrá que revisar antes de adoptar).
 
 Flujo requerido antes del primer envío:
 
