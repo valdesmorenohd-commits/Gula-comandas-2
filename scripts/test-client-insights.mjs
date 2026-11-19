@@ -8,6 +8,7 @@ const orders=[
 ];
 const r=clientPurchaseReport(orders,'a');
 assert.equal(r.orders,2);assert.equal(r.total,11000);assert.equal(r.units,4);assert.equal(r.average,5500);
+assert.equal(r.avgDaysBetween,6);
 assert.equal(r.products[0].name,'Churros');assert.equal(r.products[0].units,3);assert.equal(r.products[0].orders,2);
 assert.equal(clientPurchaseReport(orders,'sin').orders,0);
 assert.equal(validBirthday('2024-02-29'),'2024-02-29');assert.equal(validBirthday('2025-02-29'),'');
