@@ -46,3 +46,11 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - Los cierres son **fotos locales de prueba**, sin reapertura, trazabilidad multiusuario ni concurrencia transaccional. Los cambios posteriores de pedidos preexistentes pueden afectar registros históricos; **no usar para caja real**.
 - El informe incorpora las entradas y salidas de caja por fecha de cada movimiento; se diferencia del filtro por fecha de creación o entrega de comandas.
 - Importante: todavía falta definir y probar saldo de apertura/cierre persistido entre jornadas, arqueos reales, autorizaciones, manejo de anulaciones/devoluciones, cierres seguros y reconciliación al sincronizar con Firebase.
+
+## Anulación y devoluciones — demo local
+- Historial permite anular una comanda (motivo obligatorio, confirmación), sin borrarla ni permitir editarla después.
+- Si la comanda tenía reserva de stock registrada, esta se libera una vez, con movimiento histórico; los pedidos más antiguos que no reservaron stock no generan devolución artificial.
+- La anulación **no genera automáticamente una devolución de dinero**. Si la comanda cobró algo, Caja presenta «Por devolver» y un formulario de devolución manual.
+- Cada devolución registra monto, medio, fecha/hora y motivo; genera un egreso separado en el libro de movimientos. Se prohíben devoluciones que superen lo cobrado pendiente de devolver.
+- Las comandas anuladas no se cuentan como ventas activas ni como cuentas por cobrar; sí permanecen en Historial, filtros e informes.
+- Todo es local a navegador y usuario. No hay permisos de administrador implementados, reconciliación de pagos con banco ni control transaccional multiusuario. **No usar para reembolsos, ventas, devoluciones ni cierres reales**.
