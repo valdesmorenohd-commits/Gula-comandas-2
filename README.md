@@ -101,3 +101,10 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - `firebase/acceptance-tests.md` documenta las pruebas que faltan ejecutar antes de permitir sincronización.
 - Administración muestra el estado real de cada componente; todavía no se ha activado lectura/escritura de Firestore ni migración de datos.
 - La decisión de producción debe incluir seguridad por acción, transacciones e idempotencia, verificación entre dispositivos y costo bajo el plan Spark. El sistema anterior permanece intacto.
+
+## Nueva comanda — selector de productos en ventana emergente
+- Ahora tanto la vista Listado como Fotografías presentan productos seleccionables; tocar una tarjeta/fila abre una ventana modal con +/−, cantidad editable (0–99), opción/recargo (cuando existe), subtotal y stock local de referencia.
+- Confirmar actualiza la selección temporal de la comanda y el total; cantidad 0 quita el producto. Cancelar/cerrar no aplica cambios.
+- La selección se conserva al cambiar la vista, la categoría o la búsqueda. Al editar una comanda se cargan las cantidades existentes; cancelar la edición limpia la selección.
+- Limitación actual: **una opción por producto** en cada comanda. Faltan líneas independientes para combinaciones del mismo producto con opciones distintas, y pruebas visuales en Safari iPhone/Android.
+- Sigue siendo una demo local. Stock y saldo deben verificarse transaccionalmente en el futuro backend antes del uso real.
