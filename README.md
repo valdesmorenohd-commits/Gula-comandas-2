@@ -117,3 +117,11 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - Las categorías que no tengan productos se muestran también; los productos sin categoría permanecen en la tarjeta «Sin categoría».
 - El respaldo JSON manual incluye ahora las categorías y fotografías de portada, tanto al exportar como al restaurar.
 - Sigue sin existir sincronización Firebase ni fotos compartidas entre dispositivos. No se han agregado categorías automáticas «Dulces» o «Salados».
+
+## Caja: filtros sencillos y desglose de indicadores (demo local)
+- Los filtros visibles por defecto son búsqueda de cliente/comanda y estado de pago, con accesos rápidos «Hoy» y «Ver todo / limpiar». El resto (fecha, medio y monto) queda en «Más filtros».
+- Los seis indicadores de Caja son botones. Tocar uno abre un desglose del conjunto de comandas coincidentes con los filtros; tocar de nuevo o «Cerrar» oculta ese detalle.
+- **Total comandas** suma pedidos activos; **Por cobrar** suma saldos pendientes activos; **Por devolver** suma cobros de comandas anuladas pendientes de reembolso.
+- **Cobrado**, **Efectivo** y **TEF** se descomponen en abonos positivos y devoluciones negativas, sin duplicar el mismo pago. Las tarjetas corresponden a comandas filtradas, no al arqueo físico de caja ni a todos los movimientos independientes.
+- El libro de caja de ingresos, gastos y retiros sigue en la sección «Libro de movimientos». Estas cifras no se confunden con las seis métricas de comandas.
+- Las validaciones de sintaxis y estructura HTML son estáticas; faltan pruebas visuales completas en iPhone Safari.
