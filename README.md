@@ -73,3 +73,9 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - El total y los detalles de una comanda nueva incorporan el recargo de la opción seleccionada. La foto no se guarda en la comanda.
 - Todas las fotografías y datos se guardan solo en localStorage del navegador, con límites de espacio y sin respaldo ni sincronización Firebase. No utilizar como catálogo real hasta disponer de Storage y persistencia segura.
 - Las comandas antiguas mantienen sus datos originales. No se han eliminado ni vuelto a ingresar productos.
+
+## Administración / apariencia — demo local
+- Se agregó una sección de **personalización personal** (no global): cuatro paletas, densidad compacta/equilibrada/botones grandes, nombre de cabecera y logo procesado a miniatura local.
+- La apariencia se guarda aparte de los datos de pedidos, por UID de Firebase **en este navegador**. No se comparte, no modifica el catálogo, no sube fotos a Storage ni altera Firestore.
+- El panel de Usuarios y Permisos **solo explica la matriz prevista**; NO crea usuarios, asigna roles ni impone permisos reales. Estar autenticado NO supone ser administrador.
+- Falta implementar y auditar autorización segura de roles/grupos/acciones antes de utilizar cualquier dato real o permitir cambios de configuración global.
