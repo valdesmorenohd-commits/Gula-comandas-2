@@ -36,3 +36,13 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - Plantillas de informes guardadas **solo en el navegador y usuario actual** (no compartidas ni sincronizadas).
 - Falta: fecha individual de pago, abonos, devoluciones, transacciones de caja, informes configurables por columnas con gráficos, KPI reordenables, permisos para plantillas compartidas, exportación XLSX nativa, backend Firebase.
 - Todos los datos siguen siendo de demostración: no utilizar para operaciones reales.
+
+## Caja: movimientos y cierres (demo local)
+- Se pueden registrar cobros y abonos de comandas, egresos por compras, ingresos independientes y retiros de efectivo o TEF.
+- Cada movimiento independiente exige un monto entero positivo y motivo, almacena fecha/hora, categoría y método.
+- Libro de movimientos con filtro de fechas y separación entre entradas y salidas.
+- Resumen de efectivo y TEF: el efectivo estimado es la suma histórica de entradas menos salidas; **no sustituye el conteo físico ni el saldo inicial**.
+- Cierre por fecha con confirmación, resumen neto del día, pendientes vinculados a la fecha de entrega y conteo manual opcional; puede indicar un saldo inicial para comparar el efectivo esperado.
+- Los cierres son **fotos locales de prueba**, sin reapertura, trazabilidad multiusuario ni concurrencia transaccional. Los cambios posteriores de pedidos preexistentes pueden afectar registros históricos; **no usar para caja real**.
+- El informe incorpora las entradas y salidas de caja por fecha de cada movimiento; se diferencia del filtro por fecha de creación o entrega de comandas.
+- Importante: todavía falta definir y probar saldo de apertura/cierre persistido entre jornadas, arqueos reales, autorizaciones, manejo de anulaciones/devoluciones, cierres seguros y reconciliación al sincronizar con Firebase.
