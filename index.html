@@ -83,6 +83,17 @@ html{scroll-behavior:auto!important;overflow-anchor:none}body{overflow-anchor:no
 <div class="grid three" id="syncAuditCounts"></div>
 <div class="buttons"><button id="syncAuditRun" type="button" class="primary">Revisar integridad</button><button id="syncAuditExport" type="button" class="secondary">Descargar diagnóstico</button></div>
 <p id="syncAuditStatus" class="muted sub" role="status"></p><div id="syncAuditList" class="spaced"></div>
+<hr class="spaced"><h2>Estado de la sincronización Firebase</h2>
+<p class="muted sub">El proyecto ya tiene un diseño de colecciones, reglas cerradas y pruebas de aceptación documentadas en GitHub. <b>Esto todavía no activa la sincronización.</b></p>
+<div class="tablewrap"><table><thead><tr><th>Componente</th><th>Estado actual</th></tr></thead><tbody>
+<tr><td>Inicio de sesión Firebase</td><td>Conectado en pruebas</td></tr>
+<tr><td>Modelo compartido para pedidos, pagos y stock</td><td>Diseño documentado</td></tr>
+<tr><td>Reglas de seguridad de Firestore</td><td>Bloqueadas; archivo de referencia, no desplegado</td></tr>
+<tr><td>Usuarios, roles y permisos del servidor</td><td>Pendientes</td></tr>
+<tr><td>Transacciones seguras y prevención de duplicados</td><td>Pendientes</td></tr>
+<tr><td>Sincronización entre dispositivos</td><td>No habilitada</td></tr>
+<tr><td>Migración de datos locales</td><td>No iniciada</td></tr></tbody></table></div>
+<p class="muted sub">No se han importado comandas ni se han autorizado operaciones reales. Los datos siguen en este navegador.</p>
 <hr class="spaced"><h2>Estado técnico</h2><p><span class="chip">Firebase Authentication conectado</span></p><p>Acceso a Firestore: <b>bloqueado</b>, sin lecturas ni escrituras directas.</p><p>Rol de administrador: <b>pendiente de implementar</b>. Estar autenticado no confiere permisos.</p><p>Reservas de comandas: solo demo local, sin sincronización ni seguridad transaccional entre equipos. Impresión directa, sincronización offline y seguridad de pagos: <b>pendientes</b>.</p><hr><h2>Respaldo y recuperación de pruebas</h2><p class="muted sub">Descarga un archivo JSON con comandas, clientes, productos, pagos, stock y movimientos de Caja. Puede contener nombres, teléfonos y otras referencias personales: consérvalo en un lugar privado. No es una copia automática ni una sincronización.</p>
 <div class="buttons"><button class="primary" id="backupExport" type="button">Descargar respaldo JSON</button></div><p id="backupExportMessage" class="sub" role="status"></p>
 <h2 class="spaced">Restaurar desde un respaldo</h2><p class="muted sub">Primero selecciona el archivo y revisa el resumen. La restauración reemplaza TODOS los datos locales de prueba del usuario actual, no los combina. Antes de reemplazar, descarga el respaldo actual.</p>
