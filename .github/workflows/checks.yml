@@ -20,3 +20,5 @@ jobs:
           node-version: '22'
       - name: Revisar estructura y seguridad base
         run: node scripts/check-app.mjs
+      - name: Probar matriz de permisos simulada
+        run: node scripts/test-access-policy.mjs
