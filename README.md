@@ -87,3 +87,10 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - La recuperación **reemplaza** todos los datos locales de prueba de ese UID y navegador. No se mezclan registros ni se sincroniza a Firebase. Se rechazan respaldos de otro UID, archivos mayores de 5 MB y varios errores de estructura.
 - Conviene descargar un respaldo actual y confirmar su disponibilidad en Archivos antes de restaurar. Un respaldo descargado puede contener nombres, correos, teléfonos y observaciones; mantenerlo privado.
 - Esta función no sustituye copias automáticas, transacciones, control de acceso ni sincronización en tiempo real y está pendiente de pruebas en Safari iPhone y Android.
+
+## Diagnóstico antes de sincronizar (demo local)
+- Administración incluye «Preparación de sincronización» con un chequeo **solo local**; no se hacen lecturas/escrituras Firestore.
+- Revisa números de comanda, IDs de clientes/productos repetidos, valores negativos o inválidos de stock/precio/cobros, pagos mayores al total, devoluciones mayores a lo cobrado, referencias faltantes, cierres duplicados y comandas antiguas no vinculadas a clientes/reservas.
+- Ofrece un resumen de errores/advertencias y descarga JSON del diagnóstico. El reporte **no incluye todo el contenido de las comandas**, pero sí puede incluir nombres y números: mantener privado.
+- Una validación sin errores no certifica permisos, seguridad, sincronización, compatibilidad entre dispositivos ni concurrencia; NO autoriza uso en producción.
+- Próxima fase: definir modelo de datos y permisos de servidor; con reglas Firestore cerradas no hay sincronización y no deben abrirse reglas generales para un prototipo.
