@@ -79,3 +79,11 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - La apariencia se guarda aparte de los datos de pedidos, por UID de Firebase **en este navegador**. No se comparte, no modifica el catálogo, no sube fotos a Storage ni altera Firestore.
 - El panel de Usuarios y Permisos **solo explica la matriz prevista**; NO crea usuarios, asigna roles ni impone permisos reales. Estar autenticado NO supone ser administrador.
 - Falta implementar y auditar autorización segura de roles/grupos/acciones antes de utilizar cualquier dato real o permitir cambios de configuración global.
+
+## Respaldo y recuperación manual (demo)
+- En Administración, botón «Descargar respaldo JSON» exporta las colecciones locales de pedidos, clientes, productos (incluyendo fotos), stock, pagos, movimientos y cierres bajo el formato versionado `gula2-local-demo-backup` v1.
+- La exportación no incluye credenciales de Firebase ni preferencias personales de apariencia, ni las plantillas locales de informes.
+- Para recuperar, seleccionar un archivo JSON compatible. El programa presenta una vista previa con conteos y solo permite continuar tras revisión, confirmación y escritura de la palabra RESTAURAR.
+- La recuperación **reemplaza** todos los datos locales de prueba de ese UID y navegador. No se mezclan registros ni se sincroniza a Firebase. Se rechazan respaldos de otro UID, archivos mayores de 5 MB y varios errores de estructura.
+- Conviene descargar un respaldo actual y confirmar su disponibilidad en Archivos antes de restaurar. Un respaldo descargado puede contener nombres, correos, teléfonos y observaciones; mantenerlo privado.
+- Esta función no sustituye copias automáticas, transacciones, control de acceso ni sincronización en tiempo real y está pendiente de pruebas en Safari iPhone y Android.
