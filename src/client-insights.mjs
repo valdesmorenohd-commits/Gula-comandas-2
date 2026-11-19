@@ -13,7 +13,7 @@ export function clientPurchaseReport(orders=[],clientId){
    const option=String(item.option||'').trim();
    const key=String(item.productId||name)+'|'+option;
    const old=grouped.get(key)||{name,option,units:0,orders:0,amount:0};
-   old.units+=qty;old.orders++;old.amount+=qty*(Number(item.price)||0);units++;
+   old.units+=qty;old.orders++;old.amount+=qty*(Number(item.price)||0);units+=qty;
    grouped.set(key,old);
   }
  }
