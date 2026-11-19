@@ -54,3 +54,13 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - Cada devolución registra monto, medio, fecha/hora y motivo; genera un egreso separado en el libro de movimientos. Se prohíben devoluciones que superen lo cobrado pendiente de devolver.
 - Las comandas anuladas no se cuentan como ventas activas ni como cuentas por cobrar; sí permanecen en Historial, filtros e informes.
 - Todo es local a navegador y usuario. No hay permisos de administrador implementados, reconciliación de pagos con banco ni control transaccional multiusuario. **No usar para reembolsos, ventas, devoluciones ni cierres reales**.
+
+## Clientes — fichas individuales (demo local)
+- Lista con búsqueda por nombre, teléfono o correo, orden alfabético, mayor número de comandas o actividad reciente.
+- Crear/editar nombre, teléfono, correo, dirección de entrega y observaciones.
+- Selección de cliente existente tras cuatro caracteres: las sugerencias identifican cada ficha de manera independiente, incluso si hay nombres repetidos.
+- Nuevas comandas guardan `clientId` además del nombre de cliente capturado en el pedido; cambiar el nombre en la ficha **no reescribe** comandas antiguas.
+- Al escribir un nombre sin seleccionar una ficha existente, se crea una ficha nueva. No se fusionan automáticamente clientes con nombres iguales.
+- Ficha muestra historial, ventas activas, saldos pendientes y estados de las comandas vinculadas por identificador.
+- Las comandas creadas antes de esta actualización no contienen `clientId`: por seguridad **no se vinculan retrospectivamente por coincidencia de nombres**. Para asociarlas, el usuario puede editar la comanda y seleccionar explícitamente la ficha existente.
+- Todo sigue siendo local y de demostración; falta sincronización Firebase, validación de roles y pruebas en distintos dispositivos.
