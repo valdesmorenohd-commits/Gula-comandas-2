@@ -26,3 +26,13 @@ Hosting: GitHub Pages gratuito. Firebase Authentication y Firestore: Spark, sin 
 
 ## Próxima fase
 Desarrollar y revisar operaciones persistentes con roles y permisos antes de permitir comandos de ventas reales. Validar con pruebas funcionales en iPhone, Windows y tablet Android.
+
+
+## Informes — actualización noviembre 2026
+- Filtros combinables en la demo: período hoy/semana/mes/rango, fecha de creación o entrega, cliente/número, producto, estado de pago, medio y rango de montos.
+- Resumen recalculado por filtros y detalle al seleccionar un indicador.
+- Agrupación por día, cliente, producto, estado y medio. Al agrupar por producto, los montos corresponden a líneas de producto.
+- Orden por fecha, monto o nombre, descarga CSV compatible con Excel, impresión/guardar PDF mediante diálogo del navegador.
+- Plantillas de informes guardadas **solo en el navegador y usuario actual** (no compartidas ni sincronizadas).
+- Falta: fecha individual de pago, abonos, devoluciones, transacciones de caja, informes configurables por columnas con gráficos, KPI reordenables, permisos para plantillas compartidas, exportación XLSX nativa, backend Firebase.
+- Todos los datos siguen siendo de demostración: no utilizar para operaciones reales.
