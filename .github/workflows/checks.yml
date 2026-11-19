@@ -22,5 +22,7 @@ jobs:
         run: node scripts/check-app.mjs
       - name: Probar matriz de permisos simulada
         run: node scripts/test-access-policy.mjs
+      - name: Validar fichas locales de usuarios
+        run: node scripts/test-user-admin-draft.mjs
       - name: Revisar sintaxis de pruebas Firestore (sin desplegar reglas)
         run: node --check scripts/test-firestore-rules.mjs
