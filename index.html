@@ -303,6 +303,24 @@ body.picker-open{overflow:hidden}
 #history .history-payment-line small{display:block;color:#687b6f;font-size:12px;margin-top:4px}
 #history .history-payment-line>strong{white-space:nowrap}
 @media(max-width:680px){#history .history-payments-summary{grid-template-columns:repeat(2,minmax(0,1fr))}#history .history-order-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+#admin .role-preview-list{border:1px solid #dfe8e1;border-radius:12px;overflow:hidden;margin:12px 0}
+#admin .role-preview-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid #e6ede7;font-size:14px}
+#admin .role-preview-row:last-child{border-bottom:0}
+#admin .role-preview-row>span{min-width:0}
+#admin .role-preview-row strong{font-size:12px;white-space:nowrap;font-weight:700}
+#admin .role-yes{color:#266342}
+#admin .role-no{color:#7c7474}
+
+#admin .demo-permission-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+#admin .demo-permission-row{display:flex;align-items:center;gap:8px;border:1px solid #e0e8e1;border-radius:9px;padding:9px;min-width:0;line-height:1.35;font-size:13px}
+#admin .demo-permission-row input{flex-shrink:0;width:18px;height:18px}
+#admin .demo-user-card{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e0e8e1;padding:12px;border-radius:12px;margin:10px 0}
+#admin .demo-user-info{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}
+#admin .demo-user-info small{font-size:12px;color:#617367}
+#admin .demo-user-actions{display:flex;gap:6px;flex-wrap:wrap}
+#admin .demo-user-actions button{white-space:normal}
+@media(max-width:700px){#admin .demo-permission-list{grid-template-columns:minmax(0,1fr)}#admin .demo-user-card{display:block}#admin .demo-user-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:12px}#admin .demo-user-actions button{width:100%}}
+
 </style></head>
 <body>
 <header><div class="top"><div class="brand-head"><img id="headerLogo" alt="Logo de Gula" hidden><div><strong id="headerBrandName">GULA</strong><small>Comandas 2.0 · Pruebas</small></div></div><button id="signout" hidden>Cerrar sesión</button></div></header>
@@ -352,7 +370,14 @@ body.picker-open{overflow:hidden}
 <div><label for="adminLogoFile">Logo de prueba (opcional)</label><input id="adminLogoFile" type="file" accept="image/png,image/jpeg,image/webp"></div></div>
 <div class="spaced"><img id="adminLogoPreview" alt="Vista previa del logo" hidden></div>
 <div class="buttons"><button id="adminSaveAppearance" class="primary" type="button">Guardar apariencia</button><button id="adminRemoveLogo" class="secondary" type="button">Quitar logo</button><button id="adminResetAppearance" class="secondary" type="button">Restablecer apariencia</button></div><p id="adminAppearanceMessage" class="sub" role="status"></p></div>
-<div class="panel"><h2>Usuarios y permisos</h2><p class="muted sub">La sesión actual está autenticada, pero no tiene un rol de administrador validado. Este apartado es una guía de implementación, no un panel de permisos activo.</p><div class="tablewrap"><table><thead><tr><th>Acción</th><th>Administración principal</th><th>Personal</th></tr></thead><tbody><tr><td>Crear y consultar comandas</td><td>Previsto</td><td>Configurable</td></tr><tr><td>Editar, anular y registrar pagos</td><td>Previsto</td><td>Según permiso</td></tr><tr><td>Productos, stock y Caja</td><td>Previsto</td><td>Según permiso</td></tr><tr><td>Informes y clientes</td><td>Previsto</td><td>Según permiso</td></tr><tr><td>Roles y ajustes globales</td><td>Previsto</td><td>Sin acceso por defecto</td></tr></tbody></table></div><p><b>Estado: no habilitado.</b> Los permisos deberán validarse en Firebase antes de permitir operaciones reales.</p></div>
+<div class="panel"><h2>Usuarios y permisos</h2><p class="muted sub"><strong>Simulación de roles, no permisos activos.</strong> Selecciona un perfil para revisar qué acciones podría realizar. No cambia tu cuenta ni permite administrar usuarios: antes de producción habrá validación en Firebase.</p><div class="grid"><div><label for="rolePreview">Ver permisos del perfil</label><select id="rolePreview"><option value="principal_admin">Administración principal</option><option value="personal">Personal</option><option value="consulta">Solo consulta</option></select></div></div><p class="muted sub" id="rolePreviewCaption" role="status"></p><div id="rolePreviewList" class="role-preview-list"></div><p class="muted sub">Las excepciones individuales se validarán en el servidor; esta vista es únicamente una propuesta. Los usuarios autenticados no reciben privilegios por seleccionar un perfil aquí.</p></div>
+<div class="panel" id="demoUserPanel"><h2>Administrar usuarios (borrador)</h2>
+<p class="muted sub"><b>Solo planificación local.</b> Puedes preparar una lista de integrantes y sus permisos para revisarla. No crea cuentas, no envía invitaciones ni cambia el acceso a Firebase. Estos datos se guardan únicamente en este navegador.</p>
+<div class="grid"><div><label for="demoUserName">Nombre de la persona</label><input id="demoUserName" maxlength="80" autocomplete="off" placeholder="Nombre"></div><div><label for="demoUserEmail">Correo para futura cuenta</label><input id="demoUserEmail" type="email" maxlength="160" autocomplete="off" placeholder="correo@ejemplo.cl"></div><div><label for="demoUserRole">Perfil propuesto</label><select id="demoUserRole"><option value="personal">Personal</option><option value="consulta">Solo consulta</option><option value="principal_admin">Administración principal</option></select></div><div><label for="demoUserActive">Estado propuesto</label><select id="demoUserActive"><option value="active">Activo</option><option value="inactive">Suspendido</option></select></div></div>
+<details class="spaced" id="demoUserOverrides"><summary>Permisos individuales (opcional)</summary><p class="muted sub">Las autorizaciones críticas de Administración no pueden concederse a personal mediante excepciones. Ningún ajuste de este formulario da acceso real.</p><div id="demoUserPermissionList" class="demo-permission-list"></div></details>
+<div class="buttons spaced"><button type="button" class="primary" id="demoUserSave">Guardar ficha de prueba</button><button type="button" class="secondary" id="demoUserCancel" hidden>Cancelar edición</button></div>
+<p class="sub" id="demoUserMessage" role="status"></p><h3>Fichas preparadas</h3><div id="demoUserList"></div>
+</div>
 <div class="panel"><h2>Preparación de sincronización</h2><p class="muted sub">Revisa si los datos locales de este dispositivo están listos para migrar. No envía nada a Firebase ni altera las comandas. Este diagnóstico es orientativo y no sustituye las pruebas de concurrencia y permisos.</p>
 <div class="grid three" id="syncAuditCounts"></div>
 <div class="buttons"><button id="syncAuditRun" type="button" class="primary">Revisar integridad</button><button id="syncAuditExport" type="button" class="secondary">Descargar diagnóstico</button></div>
@@ -381,6 +406,8 @@ body.picker-open{overflow:hidden}
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import {simulateRole,PERMISSIONS,ROLE_DEFAULTS} from './src/access-policy.mjs';
+import {normalizeDemoMember,effectiveDemoPermissions,validateDemoRoster} from './src/user-admin-draft.mjs';
 import {clientPurchaseReport,validBirthday,birthdayInDays,birthdayAlerts,birthdayWindowOffset,birthdayWindowClients} from './src/client-insights.mjs';
 const firebase=initializeApp({apiKey:"AIzaSyA_56edZKtiysPPNc9geqA687gQBXjGxgY",authDomain:"gula-comandas-2-0-pruebas.firebaseapp.com",projectId:"gula-comandas-2-0-pruebas",storageBucket:"gula-comandas-2-0-pruebas.firebasestorage.app",messagingSenderId:"230420123464",appId:"1:230420123464:web:63564b926d6bbfee70ed7d"});
 const auth=getAuth(firebase),$=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(n);
@@ -786,6 +813,89 @@ function reportRowsCSV(){const items=reportSort(reportFiltered());return [['Coma
 $('rExport').addEventListener('click',()=>{const rows=reportRowsCSV();const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='gula2-informe-demo.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)});
 $('rPrint').addEventListener('click',()=>{const orders=reportFiltered(),markup='<html lang="es"><head><meta charset="utf-8"><title>Gula 2.0 informe demo</title><style>body{font-family:sans-serif;margin:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:7px}h1{font-size:22px}small{color:#666}</style></head><body><h1>Gula Comandas 2.0 · Informe de prueba</h1><small>Solo datos locales de demostración · '+new Date().toLocaleString('es-CL')+'</small><p>'+orders.length+' comandas · '+money(financeStats(orders).total)+' en total</p>'+reportTable(orders)+'</body></html>';const popup=window.open('','_blank');if(!popup){alert('Permite las ventanas emergentes de Safari para imprimir o guardar PDF.');return}popup.document.open();popup.document.write(markup);popup.document.close();popup.focus();setTimeout(()=>popup.print(),400)});
 
+function renderRolePreview(){
+ const role=$('rolePreview').value,rows=simulateRole(role),yes=rows.filter(x=>x.allowed).length;
+ $('rolePreviewCaption').textContent=yes+' de '+rows.length+' acciones habilitadas en este perfil de ejemplo.';
+ $('rolePreviewList').innerHTML=rows.map(row=>'<div class="role-preview-row"><span>'+escapeHTML(row.label)+'</span><strong class="'+(row.allowed?'role-yes':'role-no')+'">'+(row.allowed?'Permitido':'Sin acceso')+'</strong></div>').join('');
+}
+$('rolePreview').addEventListener('change',renderRolePreview);
+renderRolePreview();
+
+const demoUserKey=uid=>'gula2_local_user_plan_v1_'+uid;
+let demoUsers=[],editingDemoUserId=null;
+function loadDemoUsers(){
+ demoUsers=[];editingDemoUserId=null;if(!user)return;$('demoUserMessage').textContent='';$('demoUserMessage').className='sub';
+ try{const rows=JSON.parse(localStorage.getItem(demoUserKey(user.uid))||'[]');demoUsers=validateDemoRoster(rows)}
+ catch(e){console.warn('No se pudieron leer las fichas locales de usuarios',e);resetDemoUserForm();renderDemoUsers();$('demoUserMessage').className='error';$('demoUserMessage').textContent='No se pudo leer el borrador anterior. No se modificó el archivo local.';return}
+ resetDemoUserForm();renderDemoUsers();
+}
+function storeDemoUsers(rows){
+ const checked=validateDemoRoster(rows);
+ localStorage.setItem(demoUserKey(user.uid),JSON.stringify(checked));
+ demoUsers=checked;renderDemoUsers();
+}
+function resetDemoUserForm(){
+ editingDemoUserId=null;
+ for(const id of ['demoUserName','demoUserEmail'])$(id).value='';
+ $('demoUserRole').value='personal';$('demoUserActive').value='active';
+ $('demoUserOverrides').open=false;
+ $('demoUserSave').textContent='Guardar ficha de prueba';
+ $('demoUserCancel').hidden=true;
+ renderDemoUserPermissions();
+}
+function renderDemoUserPermissions(grants=[],denies=[]){
+ const defaults=new Set(ROLE_DEFAULTS[$('demoUserRole').value]||[]),grantSet=new Set(grants),denySet=new Set(denies);
+ const role=$('demoUserRole').value;
+ const restricted=new Set(['users.manage','settings.manage','backups.restore']);
+ $('demoUserPermissionList').innerHTML=PERMISSIONS.map(([key,label])=>{
+  const locked=restricted.has(key)&&role!=='principal_admin';
+  const yes=!locked&&!denySet.has(key)&&(grantSet.has(key)||defaults.has(key));
+  return '<label class="demo-permission-row"><input type="checkbox" data-user-permission="'+key+'" '+(yes?'checked':'')+' '+(locked?'disabled':'')+'><span>'+escapeHTML(label)+(locked?' · solo administrador':'')+'</span></label>';
+ }).join('');
+}
+function renderDemoUsers(){
+ const panel=$('demoUserList');panel.innerHTML=demoUsers.length?demoUsers.map(u=>{
+  const count=effectiveDemoPermissions(u).length,roleName=u.roleId==='principal_admin'?'Administración principal':u.roleId==='personal'?'Personal':'Solo consulta';
+  return '<article class="demo-user-card"><div class="demo-user-info"><b>'+escapeHTML(u.name)+'</b><small>'+escapeHTML(u.email)+'</small><small>'+escapeHTML(roleName)+' · '+(u.active?'Activo':'Suspendido')+' · '+count+' permisos</small></div><div class="demo-user-actions"><button type="button" class="secondary" data-demo-edit="'+u.id+'">Editar</button><button type="button" class="secondary" data-demo-remove="'+u.id+'">Quitar ficha</button></div></article>'
+ }).join(''):'<p class="muted sub">No hay usuarios preparados todavía.</p>';
+}
+$('demoUserRole').addEventListener('change',()=>renderDemoUserPermissions());
+$('demoUserCancel').addEventListener('click',()=>{resetDemoUserForm();$('demoUserMessage').textContent='Edición cancelada.'});
+$('demoUserSave').addEventListener('click',()=>{
+ const msg=$('demoUserMessage');msg.className='error';msg.textContent='';
+ if(!user){msg.textContent='Debes iniciar sesión.';return}
+ try{
+  const roleId=$('demoUserRole').value,defaults=new Set(ROLE_DEFAULTS[roleId]||[]);
+  const checks=[...document.querySelectorAll('#demoUserPermissionList input[data-user-permission]:not(:disabled)')];
+  const grants=checks.filter(c=>c.checked&&!defaults.has(c.dataset.userPermission)).map(c=>c.dataset.userPermission);
+  const denies=checks.filter(c=>!c.checked&&defaults.has(c.dataset.userPermission)).map(c=>c.dataset.userPermission);
+  const entry=normalizeDemoMember({id:editingDemoUserId||'demo-'+crypto.randomUUID(),name:$('demoUserName').value,email:$('demoUserEmail').value,roleId,active:$('demoUserActive').value==='active',grants,denies});
+  if(demoUsers.some(u=>u.email===entry.email&&u.id!==entry.id))throw Error('Ya hay una ficha con ese correo.');
+  const updated=editingDemoUserId?demoUsers.map(u=>u.id===editingDemoUserId?entry:u):[...demoUsers,entry];
+  storeDemoUsers(updated);resetDemoUserForm();msg.className='success';msg.textContent='Ficha de planificación guardada solo en este navegador. No se creó ninguna cuenta.';
+ }catch(e){msg.textContent='No se guardó: '+e.message}
+});
+$('demoUserList').addEventListener('click',e=>{
+ const edit=e.target.closest('[data-demo-edit]'),remove=e.target.closest('[data-demo-remove]'),msg=$('demoUserMessage');
+ if(edit){
+  const u=demoUsers.find(m=>m.id===edit.dataset.demoEdit);if(!u)return;
+  editingDemoUserId=u.id;$('demoUserName').value=u.name;$('demoUserEmail').value=u.email;
+  $('demoUserRole').value=u.roleId;$('demoUserActive').value=u.active?'active':'inactive';
+  renderDemoUserPermissions(u.grants,u.denies);
+  $('demoUserSave').textContent='Guardar cambios de prueba';$('demoUserCancel').hidden=false;$('demoUserOverrides').open=false;
+  msg.textContent='Editando una ficha local; el acceso real no cambia.';$('demoUserPanel').scrollIntoView({behavior:'smooth',block:'start'});
+ }
+ if(remove){
+  const u=demoUsers.find(m=>m.id===remove.dataset.demoRemove);if(!u)return;
+  if(!confirm('¿Quitar la ficha local de '+u.name+'? No afecta cuentas de Firebase.'))return;
+  try{storeDemoUsers(demoUsers.filter(m=>m.id!==u.id));resetDemoUserForm();msg.className='success';msg.textContent='Ficha local eliminada; no se eliminó ninguna cuenta real.'}
+  catch(e){msg.className='error';msg.textContent='No se pudo quitar la ficha: '+e.message}
+ }
+});
+renderDemoUserPermissions();
+renderDemoUsers();
+
+
 function render(){renderProducts();renderHistory();renderOrderBirthdayNotice();renderClients();renderStock();renderFinance();renderCashExtras();renderReports();calculate();syncPaymentMethodVisibility()}
 function itemCounts(items){const counts=new Map();for(const x of items||[]){const id=x.productId||(state.products.find(p=>p.name===x.product&&p.price===x.price)?.id);if(!id)continue;counts.set(id,(counts.get(id)||0)+Number(x.qty||0))}return counts}
 function validateAndApplyStock(number,oldItems,newItems,wasManaged){const old=wasManaged?itemCounts(oldItems):new Map(),next=itemCounts(newItems),changes=[];for(const id of new Set([...old.keys(),...next.keys()])){const p=state.products.find(x=>x.id===id);if(!p)continue;const delta=(next.get(id)||0)-(old.get(id)||0),available=Number(p.stock||0);if(delta>available)return {error:'Stock insuficiente de '+p.name+'. Disponible: '+available+'; requiere '+delta+' adicionales.'};if(delta!==0)changes.push({p,delta,previous:available})}return {changes}}
@@ -818,5 +928,5 @@ $('addProduct').addEventListener('click',()=>{const name=$('pName').value.trim()
 $('clearDemo').addEventListener('click',()=>{if(confirm('¿Borrar SOLO los datos locales de demostración de este navegador?')){state=blank();persist();render();go('new')}});
 $('login').addEventListener('submit',async e=>{e.preventDefault();$('loginbtn').disabled=true;$('loginerror').textContent='';try{await signInWithEmailAndPassword(auth,$('email').value,$('pwd').value);$('pwd').value=''}catch(err){$('loginerror').textContent='No fue posible ingresar ('+err.code+'). Revisa correo y contraseña.'}finally{$('loginbtn').disabled=false}});
 $('signout').addEventListener('click',()=>signOut(auth));
-onAuthStateChanged(auth,u=>{user=u;$('auth').hidden=!!u;$('app').hidden=!u;$('signout').hidden=!u;if(u){load(u.uid);loadAppearance();loadBirthdayRange();renderTemplates();go('new')}else{birthdayRange=2;$('birthdayAlertRange').value='2';state=blank();appearance=defaultAppearance();pendingLogo=null;applyAppearance()}},e=>{$('loginerror').textContent='No se pudo verificar la sesión: '+e.code});
+onAuthStateChanged(auth,u=>{user=u;$('auth').hidden=!!u;$('app').hidden=!u;$('signout').hidden=!u;if(u){load(u.uid);loadAppearance();loadDemoUsers();loadBirthdayRange();renderTemplates();go('new')}else{demoUsers=[];resetDemoUserForm();renderDemoUsers();birthdayRange=2;$('birthdayAlertRange').value='2';state=blank();appearance=defaultAppearance();pendingLogo=null;applyAppearance()}},e=>{$('loginerror').textContent='No se pudo verificar la sesión: '+e.code});
 </script></body></html>
