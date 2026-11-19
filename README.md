@@ -64,3 +64,12 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - Ficha muestra historial, ventas activas, saldos pendientes y estados de las comandas vinculadas por identificador.
 - Las comandas creadas antes de esta actualización no contienen `clientId`: por seguridad **no se vinculan retrospectivamente por coincidencia de nombres**. Para asociarlas, el usuario puede editar la comanda y seleccionar explícitamente la ficha existente.
 - Todo sigue siendo local y de demostración; falta sincronización Firebase, validación de roles y pruebas en distintos dispositivos.
+
+## Productos: catálogo ampliado — demo local
+- Categoría por producto, búsqueda y filtro por categoría.
+- Selector de vista listado/fotografías para Nueva comanda; fotos cuadradas procesadas localmente en el navegador, sin subir archivos.
+- Ficha de edición incluye nombre, precio, categoría, costo unitario opcional, fotografía y opciones de producto con recargo.
+- Opciones editables en formato `Nombre|recargo` (una por línea). En esta primera demo se admite **una opción por producto y línea**; no permite mezclar varias opciones para distintas unidades del mismo producto dentro de una única línea. Sigue pendiente el modelo de múltiples grupos independientes y selección por unidad.
+- El total y los detalles de una comanda nueva incorporan el recargo de la opción seleccionada. La foto no se guarda en la comanda.
+- Todas las fotografías y datos se guardan solo en localStorage del navegador, con límites de espacio y sin respaldo ni sincronización Firebase. No utilizar como catálogo real hasta disponer de Storage y persistencia segura.
+- Las comandas antiguas mantienen sus datos originales. No se han eliminado ni vuelto a ingresar productos.
