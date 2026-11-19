@@ -78,3 +78,19 @@ La rama `gula2-desarrollo` incluye `src/access-policy.mjs`, una **política de s
 - Sin membresía válida, pertenencia a empresa, coincidencia UID o rol reconocido, **denegar por defecto**.
 
 **Limitación crítica:** cualquier código de permisos en el navegador puede manipularse. Para producción será indispensable comprobar membresía activa, identidad, empresa y capacidades en un lado confiable antes de cada lectura y cambio de datos; utilizar reglas/servidor y pruebas negativas reales. No confiar en el selector de vista, la caché local o la simulación como protección.
+
+## Administración de usuarios — estado de desarrollo
+
+En `Administración → Administrar usuarios (borrador)` se pueden preparar fichas de integrantes (nombre, correo, rol, estado activo/suspendido y permisos individuales). **Son borradores locales por UID y navegador**, nunca cuentas de Firebase, invitaciones enviadas ni autorizaciones reales. Se almacenan en `localStorage` con un namespace independiente de pedidos, fotografías y otros datos. No incluyen contraseñas. Los cambios no se sincronizan ni aparecen a otros usuarios.
+
+### Activación real — flujo pendiente
+
+1. El administrador principal debe quedar **designado desde un entorno de confianza**, verificando la titularidad de la cuenta. **No** bastará seleccionar el rol admin desde la web.
+2. El administrador abre **Administración → Usuarios y permisos** y solicita invitar por correo o editar una membresía existente.
+3. Un servicio de administración seguro (con Firebase Auth verificado y comprobación de membresía actual/permiso `users.manage`) realiza la operación. Ninguna llamada del cliente puede elegir su `actorUid`, conceder privilegios al propio usuario ni cambiar membresías de otra empresa.
+4. Las cuentas se crean/invitan con mecanismos compatibles con Firebase Authentication, **sin manejar contraseñas en el cliente ni almacenarlas en GitHub**. La membresía se asocia al UID real y se deja pendiente hasta la aceptación correspondiente.
+5. Antes de asignar/editar/suspender privilegios, el servidor valida que queda al menos un administrador principal activo, registra la auditoría con fecha de servidor y aplica cambios de forma atómica cuando corresponda.
+6. Las operaciones de pedidos, pagos, clientes, inventario y Caja se autorizan también del lado confiable, por capacidad individual, sin depender de ocultar botones. Las reglas de lectura de prueba `firestore.readonly-preview.rules` aún utilizan únicamente roles y no reflejan excepciones individuales, por lo que **no deben publicarse como reglas definitivas**.
+7. La suspensión debe impedir nuevas operaciones en el servidor incluso si un cliente conserva una sesión iniciada; se comprobará la revocación y caducidad de credenciales con pruebas de seguridad.
+
+Las fichas locales no migran automáticamente a producción, no pueden verificar un correo existente de Firebase y **no constituyen autorización para acceder a ventas reales**.
