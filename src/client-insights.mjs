@@ -17,9 +17,11 @@ export function clientPurchaseReport(orders=[],clientId){
    grouped.set(key,old);
   }
  }
- const first=matched.map(o=>o.createdAt||'').filter(Boolean).sort()[0]||'';
- const last=matched.map(o=>o.createdAt||'').filter(Boolean).sort().at(-1)||'';
- return {orders:matched.length,total,units,average:matched.length?Math.round(total/matched.length):0,first,last,products:[...grouped.values()].sort((a,b)=>b.units-a.units||b.amount-a.amount||a.name.localeCompare(b.name,'es'))};
+ const timestamps=matched.map(o=>Date.parse(o.createdAt||'')).filter(Number.isFinite).sort((a,b)=>a-b);
+ const first=timestamps.length?new Date(timestamps[0]).toISOString():'';
+ const last=timestamps.length?new Date(timestamps.at(-1)).toISOString():'';
+ const avgDaysBetween=timestamps.length>1?Math.round((timestamps.at(-1)-timestamps[0])/86400000/(timestamps.length-1)):null;
+ return {orders:matched.length,total,units,average:matched.length?Math.round(total/matched.length):0,first,last,avgDaysBetween,products:[...grouped.values()].sort((a,b)=>b.units-a.units||b.amount-a.amount||a.name.localeCompare(b.name,'es'))};
 }
 export function validBirthday(value){
  if(!value)return '';
