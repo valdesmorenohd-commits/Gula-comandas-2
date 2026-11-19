@@ -289,6 +289,20 @@ body.picker-open{overflow:hidden}
  #history .history-order-actions button{white-space:normal;overflow-wrap:anywhere;font-size:13px;line-height:1.2;min-height:41px;padding:9px 6px}
 }
 @media(min-width:681px){#history .history-order-actions{flex-wrap:wrap}}
+
+/* Desglose de pagos por comanda: expandible y sin información redundante */
+#history .history-order-card{flex-direction:column;align-items:stretch}
+#history .history-order-actions{justify-content:flex-start;flex-wrap:wrap}
+#history .history-payments{border-top:1px solid #dce6de;margin-top:3px;padding-top:9px;width:100%;min-width:0}
+#history .history-payments summary{cursor:pointer;color:#214b35;font-weight:700;padding:8px 0;font-size:14px}
+#history .history-payments-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+#history .history-payments-summary>div{background:#edf4ef;border-radius:10px;padding:10px;min-width:0}
+#history .history-payments-summary small{display:block;color:#62776b;font-size:12px}
+#history .history-payments-summary strong{display:block;font-size:17px;margin-top:4px;overflow-wrap:anywhere}
+#history .history-payment-line{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 3px;border-bottom:1px solid #e0e8e2}
+#history .history-payment-line small{display:block;color:#687b6f;font-size:12px;margin-top:4px}
+#history .history-payment-line>strong{white-space:nowrap}
+@media(max-width:680px){#history .history-payments-summary{grid-template-columns:repeat(2,minmax(0,1fr))}#history .history-order-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head>
 <body>
 <header><div class="top"><div class="brand-head"><img id="headerLogo" alt="Logo de Gula" hidden><div><strong id="headerBrandName">GULA</strong><small>Comandas 2.0 · Pruebas</small></div></div><button id="signout" hidden>Cerrar sesión</button></div></header>
@@ -592,6 +606,21 @@ $('historyList').addEventListener('click',e=>{
  const b=e.target.closest('button[data-edit]');if(b){closeHistoryPayment();editOrder(Number(b.dataset.edit));return}
  const cancel=e.target.closest('button[data-cancel]');if(cancel){closeHistoryPayment();cancelOrder(Number(cancel.dataset.cancel))}
 });
+function historyPaymentDetail(o){
+ const payments=orderPayments(o).map(p=>({type:'Abono',value:Number(p.amount||0),method:p.method||'Efectivo',at:p.at||''}));
+ const refunds=orderRefunds(o).map(p=>({type:'Devolución',value:-Number(p.amount||0),method:p.method||'Efectivo',at:p.at||''}));
+ const rows=[...payments,...refunds].sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+ const returned=refundedTotal(o);
+ const metrics=[['Total',money(Number(o.total||0))],['Pagado',money(orderPaid(o))],['Por cobrar',money(orderBalance(o))]];
+ if(o.canceled||returned)metrics.push(['Devuelto',money(returned)],['Por devolver',money(refundPending(o))]);
+ return '<details class="history-payments"><summary>Ver pagos y saldo ('+payments.length+' pago(s))</summary>'
+ +'<div class="history-payments-summary">'+metrics.map(([label,value])=>'<div><small>'+label+'</small><strong>'+value+'</strong></div>').join('')+'</div>'
+ +(rows.length?'<div class="history-payments-list">'+rows.map(p=>{
+ const date=p.at?new Date(p.at):null;
+ const label=date&&!Number.isNaN(date.getTime())?new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(date):'Sin fecha';
+ return '<div class="history-payment-line"><div><b>'+p.type+'</b><small>'+escapeHTML(label)+' · '+escapeHTML(p.method)+'</small></div><strong>'+ (p.value<0?'−':'+')+money(Math.abs(p.value))+'</strong></div>'
+ }).join('')+'</div>':'<p class="muted sub">Sin pagos registrados.</p>')+'</details>';
+}
 function renderHistory(){
  const query=normalizeName($('historySearch').value),status=$('historyStatus').value;
  const matched=state.orders.map((o,i)=>({o,i})).filter(({o})=>(!query||normalizeName(o.number).includes(query)||normalizeName(o.customer).includes(query))&&(!status||orderStatus(o)===status)).reverse();
@@ -599,7 +628,7 @@ function renderHistory(){
  if(!matched.length){$('historyList').innerHTML='<div class="empty">No hay comandas para estos filtros.</div>';return}
  $('historyList').innerHTML='<div class="history-order-list">'+matched.map(({o,i})=>{
   const status=orderStatus(o),kind=status==='Pagado'?'paid':status==='Anulada'?'canceled':status==='Abonado'?'partial':'pending';
-  return '<article class="history-order-card history-'+kind+'"><div class="history-order-main"><div class="history-order-heading"><strong>'+escapeHTML(o.number)+'</strong><span class="history-status history-status-'+kind+'">'+escapeHTML(status)+'</span></div><div class="history-order-client">'+escapeHTML(o.customer)+'</div><div class="history-order-detail"><span>Entrega: '+escapeHTML(o.delivery||'Sin fecha')+(o.deliveryTime?' · '+escapeHTML(o.deliveryTime):'')+'</span><span>Total: <b>'+money(Number(o.total||0))+'</b></span>'+(status==='Abonado'?'<span>Saldo: <b>'+money(orderBalance(o))+'</b></span>':'')+'</div></div><div class="history-order-actions">'+(o.canceled?'<small class="muted">Anulada · '+escapeHTML(o.cancelReason||'Sin detalle')+'</small>':'<button class="secondary" type="button" data-edit="'+i+'">Editar</button>'+(orderBalance(o)>0?'<button class="primary" type="button" data-history-pay="'+i+'">Registrar pago</button>':'')+'<button class="danger" type="button" data-cancel="'+i+'">Anular</button>')+'</div></article>'
+  return '<article class="history-order-card history-'+kind+'"><div class="history-order-main"><div class="history-order-heading"><strong>'+escapeHTML(o.number)+'</strong><span class="history-status history-status-'+kind+'">'+escapeHTML(status)+'</span></div><div class="history-order-client">'+escapeHTML(o.customer)+'</div><div class="history-order-detail"><span>Entrega: '+escapeHTML(o.delivery||'Sin fecha')+(o.deliveryTime?' · '+escapeHTML(o.deliveryTime):'')+'</span><span>Total: <b>'+money(Number(o.total||0))+'</b></span>'+(status==='Abonado'?'<span>Saldo: <b>'+money(orderBalance(o))+'</b></span>':'')+'</div></div><div class="history-order-actions">'+(o.canceled?'<small class="muted">Anulada · '+escapeHTML(o.cancelReason||'Sin detalle')+'</small>':'<button class="secondary" type="button" data-edit="'+i+'">Editar</button>'+(orderBalance(o)>0?'<button class="primary" type="button" data-history-pay="'+i+'">Registrar pago</button>':'')+'<button class="danger" type="button" data-cancel="'+i+'">Anular</button>')+'</div>'+historyPaymentDetail(o)+'</article>'
  }).join('')+'</div>';
 }
 $('historySearch').addEventListener('input',renderHistory);
