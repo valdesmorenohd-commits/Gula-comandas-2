@@ -18,7 +18,7 @@ En un computador con Node y Firebase CLI instalados, usar un proyecto de emulado
 
 ```bash
 npm install --no-save @firebase/rules-unit-testing firebase
-firebase emulators:exec --project gula2-rules-local-test --only firestore --config firebase/emulator-test.json "node scripts/test-firestore-rules.mjs"
+firebase emulators:exec --project demo-gula2-rules-local-test --only firestore --config firebase/emulator-test.json "node scripts/test-firestore-rules.mjs"
 ```
 
 La configuración local está en `firebase/emulator-test.json` y apunta explícitamente al archivo original **cerrado**. El propio test carga la política alternativa para el entorno aislado.
