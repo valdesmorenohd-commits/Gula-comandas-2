@@ -24,5 +24,7 @@ jobs:
         run: node scripts/test-access-policy.mjs
       - name: Validar fichas locales de usuarios
         run: node scripts/test-user-admin-draft.mjs
+      - name: Verificar informes de clientes y recordatorios
+        run: node scripts/test-client-insights.mjs
       - name: Revisar sintaxis de pruebas Firestore (sin desplegar reglas)
         run: node --check scripts/test-firestore-rules.mjs
