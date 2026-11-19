@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {normalizeDemoMember,effectiveDemoPermissions,validateDemoRoster} from '../src/user-admin-draft.mjs';
+const x=normalizeDemoMember({name:'  Persona   Ejemplo  ',email:' Example@Mail.cl ',roleId:'personal',grants:['orders.cancel','orders.cancel','users.manage'],denies:['cash.manage']});
+assert.equal(x.name,'Persona Ejemplo');
+assert.equal(x.email,'example@mail.cl');
+assert.deepEqual(x.grants,['orders.cancel']);
+assert.ok(effectiveDemoPermissions(x).includes('orders.cancel'));
+assert.ok(!effectiveDemoPermissions(x).includes('cash.manage'));
+assert.ok(!effectiveDemoPermissions(x).includes('users.manage'));
+assert.deepEqual(effectiveDemoPermissions({...x,active:false}),[]);
+assert.throws(()=>normalizeDemoMember({name:'A',email:'a@b.cl',roleId:'personal'}));
+assert.throws(()=>normalizeDemoMember({name:'AB',email:'no-es-correo',roleId:'consulta'}));
+assert.throws(()=>normalizeDemoMember({name:'AB',email:'a@b.cl',roleId:'admin'}));
+const id='demo-12345678';
+assert.throws(()=>validateDemoRoster([{...x,id},{...x,id:'demo-87654321'}]));
+assert.equal(validateDemoRoster([{...x,id}]).length,1);
+console.log('12 verificaciones de fichas locales de usuarios correctas.');
