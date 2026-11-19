@@ -125,3 +125,10 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - **Cobrado**, **Efectivo** y **TEF** se descomponen en abonos positivos y devoluciones negativas, sin duplicar el mismo pago. Las tarjetas corresponden a comandas filtradas, no al arqueo físico de caja ni a todos los movimientos independientes.
 - El libro de caja de ingresos, gastos y retiros sigue en la sección «Libro de movimientos». Estas cifras no se confunden con las seis métricas de comandas.
 - Las validaciones de sintaxis y estructura HTML son estáticas; faltan pruebas visuales completas en iPhone Safari.
+
+## Caja simplificada (demo local)
+- Pantalla inicial: búsqueda rápida, elección **Fecha de venta (creación)** o **Fecha de entrega**, accesos Hoy/Todo y seis indicadores interactivos con desglose.
+- En «Filtros adicionales» se conservan estado, medio, rango de fechas y montos.
+- «Consultar o gestionar» muestra **una sola sección a la vez**: movimientos de pago, ingresos/gastos/retiros, devoluciones o cierre diario. Por defecto, «Solo resumen» deja ocultas las cuatro secciones.
+- **Semántica temporal:** los indicadores agrupan comandas por la fecha de referencia seleccionada; los cobros de esas comandas pueden haber ocurrido otro día. «Movimientos de pago» filtra **por la fecha real del pago**; los cierres se calculan según la fecha efectiva de los movimientos. Por tanto, «Cobrado» en el resumen filtrado de comandas no es necesariamente el dinero que entró en Caja ese día.
+- Se mantienen registros y operaciones locales existentes. No se ha activado sincronización con Firestore ni se han ejecutado pruebas funcionales completas en Safari.
