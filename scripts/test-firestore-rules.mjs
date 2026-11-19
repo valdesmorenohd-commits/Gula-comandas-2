@@ -8,7 +8,7 @@ import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/ru
 import {doc,getDoc,setDoc,collection,getDocs} from 'firebase/firestore';
 
 assert.ok(process.env.FIRESTORE_EMULATOR_HOST,'No ejecutar fuera del emulador de Firestore');
-const projectId='gula2-rules-local-test';
+const projectId='demo-gula2-rules-local-test';
 const rules=readFileSync(new URL('../firebase/firestore.readonly-preview.rules',import.meta.url),'utf8');
 const env=await initializeTestEnvironment({projectId,firestore:{rules}});
 const document=(db,path)=>doc(db,...path.split('/'));
