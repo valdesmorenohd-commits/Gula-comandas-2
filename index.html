@@ -641,9 +641,9 @@ renderRolePreview();
 const demoUserKey=uid=>'gula2_local_user_plan_v1_'+uid;
 let demoUsers=[],editingDemoUserId=null;
 function loadDemoUsers(){
- demoUsers=[];editingDemoUserId=null;if(!user)return;
+ demoUsers=[];editingDemoUserId=null;if(!user)return;$('demoUserMessage').textContent='';$('demoUserMessage').className='sub';
  try{const rows=JSON.parse(localStorage.getItem(demoUserKey(user.uid))||'[]');demoUsers=validateDemoRoster(rows)}
- catch(e){console.warn('No se pudieron leer las fichas locales de usuarios',e);$('demoUserMessage').textContent='No se pudo leer el borrador anterior. No se modificó el archivo local.';return}
+ catch(e){console.warn('No se pudieron leer las fichas locales de usuarios',e);resetDemoUserForm();renderDemoUsers();$('demoUserMessage').className='error';$('demoUserMessage').textContent='No se pudo leer el borrador anterior. No se modificó el archivo local.';return}
  resetDemoUserForm();renderDemoUsers();
 }
 function storeDemoUsers(rows){
