@@ -551,7 +551,7 @@ function renderClientPurchases(c){
  const r=clientPurchaseReport(state.orders,c.id);
  const last=r.last&&!Number.isNaN(new Date(r.last).getTime())?new Date(r.last).toLocaleDateString('es-CL'):'Sin ventas';
  $('clientPurchaseInsights').innerHTML='<div class="client-insight-summary">'+[
- ['Compras',String(r.orders)],['Unidades',String(r.units)],['Compra promedio',money(r.average)],['Última compra',escapeHTML(last)]
+ ['Compras',String(r.orders)],['Unidades',String(r.units)],['Compra promedio',money(r.average)],['Última compra',escapeHTML(last)],['Frecuencia aproximada',r.avgDaysBetween===null?'Sin datos':'Cada '+r.avgDaysBetween+' día(s)']
  ].map(([k,v])=>'<div class="client-insight-stat"><span>'+k+'</span><b>'+v+'</b></div>').join('')+'</div>'+
  (r.products.length?'<h3>Productos comprados</h3>'+r.products.map(p=>'<div class="client-product-row"><div><b>'+escapeHTML(p.name)+'</b>'+(p.option?'<small>Opción: '+escapeHTML(p.option)+'</small>':'')+'<small>'+p.orders+' compra(s) · '+money(p.amount)+' en productos</small></div><strong>'+p.units+' unid.</strong></div>').join(''):'<p class="muted sub">Este cliente aún no tiene productos en comandas activas vinculadas.</p>');
 }
