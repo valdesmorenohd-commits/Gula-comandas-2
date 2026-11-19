@@ -66,3 +66,15 @@ Matriz prevista: crear pedidos, leer pedidos, editar pedidos, anular, registrar 
 La fase actual permanece en Firebase Spark y GitHub Pages; esta documentación no activa servicios de pago. Cualquier backend adicional, función de servidor o requisito de facturación debe evaluarse expresamente antes de activar.
 
 Fuentes de diseño: [Reglas Firestore](https://firebase.google.com/docs/firestore/security/rules-conditions), [transacciones](https://firebase.google.com/docs/firestore/manage-data/transactions), [permisos/claims](https://firebase.google.com/docs/auth/admin/custom-claims).
+
+## Modelo de permisos — primera implementación en desarrollo
+
+La rama `gula2-desarrollo` incluye `src/access-policy.mjs`, una **política de simulación pura y comprobable**, y `scripts/test-access-policy.mjs` con casos de prueba. No se usa para autorizar operaciones en Firestore ni para impedir mutaciones del demo local. En Administración se puede previsualizar la matriz de tres perfiles sin modificar ningún usuario.
+
+- `principal_admin`: todos los permisos en el modelo; **no se asigna automáticamente** al usuario autenticado.
+- `personal`: lectura y creación de comandas, gestión de clientes/productos, ajustes de stock, cobros, movimientos de Caja y consulta de informes, sin permisos de anulación, devoluciones, cierre, restauración, roles ni configuración global por defecto.
+- `consulta`: solamente lectura de comandas e informes.
+- `grants` y `denies` representan futuras excepciones; las denegaciones tienen prioridad. Los permisos críticos de administración de usuarios, configuración global y restauración no se conceden por simples excepciones a un rol no administrador.
+- Sin membresía válida, pertenencia a empresa, coincidencia UID o rol reconocido, **denegar por defecto**.
+
+**Limitación crítica:** cualquier código de permisos en el navegador puede manipularse. Para producción será indispensable comprobar membresía activa, identidad, empresa y capacidades en un lado confiable antes de cada lectura y cambio de datos; utilizar reglas/servidor y pruebas negativas reales. No confiar en el selector de vista, la caché local o la simulación como protección.
