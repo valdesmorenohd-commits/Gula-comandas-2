@@ -137,7 +137,7 @@ function inspectLocalIntegrity(data){
  checkUnique(orders,'number','comandas');checkUnique(products,'id','productos');checkUnique(clients,'id','clientes');
  const productIds=new Set(products.map(p=>p?.id));const clientIds=new Set(clients.map(c=>c?.id));const closedDays=new Set();
  for(const c of closures){if(!c?.date||typeof c.date!=='string')note('error','cierre-fecha','Hay un cierre sin fecha.');else if(closedDays.has(c.date))note('error','cierre-duplicado','Hay más de un cierre para '+c.date+'.');else closedDays.add(c.date)}
- for(const p of products){if(!Number.isSafeInteger(Number(p.stock))||Number(p.stock)<0)note('error','stock-invalido','Stock inválido: '+String(p?.name||'?').slice(0,80));if(!Number.isSafeInteger(Number(p.price))||Number(p.price)<0)note('error','precio-invalido','Precio inválido: '+String(p?.name||'?').slice(0,80));}
+ for(const p of products){if(!p||typeof p!=='object'){note('error','producto-nulo','El catálogo contiene un producto inválido.');continue}if(!Number.isSafeInteger(Number(p.stock))||Number(p.stock)<0)note('error','stock-invalido','Stock inválido: '+String(p?.name||'?').slice(0,80));if(!Number.isSafeInteger(Number(p.price))||Number(p.price)<0)note('error','precio-invalido','Precio inválido: '+String(p?.name||'?').slice(0,80));}
  let unlinked=0,unmanaged=0,refundDue=0,overpaid=0;
  for(const o of orders){
   const number=String(o?.number||'Sin número'),total=Number(o?.total||0);
@@ -157,7 +157,7 @@ function inspectLocalIntegrity(data){
   if(o?.canceled&&refund<amount)refundDue+=amount-refund;
   if(o?.canceled&&o?.stockApplied&&!o?.stockReleased)note('warning','stock-sin-liberar','Comanda anulada sin constancia de liberación: '+number)
  }
- for(const entry of cash)if(!Number.isSafeInteger(Number(entry?.amount))||Number(entry.amount)<=0||!['Efectivo','TEF'].includes(entry?.method))note('error','caja-invalida','Movimiento de Caja inválido.');
+ for(const entry of cash)if(!Number.isSafeInteger(Number(entry?.amount))||Number(entry?.amount)<=0||!['Efectivo','TEF'].includes(entry?.method))note('error','caja-invalida','Movimiento de Caja inválido.');
  if(unlinked)note('warning','clientes-antiguos',unlinked+' comandas no tienen ficha de cliente vinculada. No se unirán automáticamente.');
  if(unmanaged)note('warning','stock-anterior',unmanaged+' comandas antiguas no cuentan con reserva de stock.');
  const summary={orders:orders.length,products:products.length,clients:clients.length,cashEntries:cash.length,closures:closures.length,refundDue,overpaid,unlinked,unmanaged,errors:issues.filter(i=>i.severity==='error').length,warnings:issues.filter(i=>i.severity==='warning').length};
