@@ -94,3 +94,10 @@ Desarrollar y revisar operaciones persistentes con roles y permisos antes de per
 - Ofrece un resumen de errores/advertencias y descarga JSON del diagnóstico. El reporte **no incluye todo el contenido de las comandas**, pero sí puede incluir nombres y números: mantener privado.
 - Una validación sin errores no certifica permisos, seguridad, sincronización, compatibilidad entre dispositivos ni concurrencia; NO autoriza uso en producción.
 - Próxima fase: definir modelo de datos y permisos de servidor; con reglas Firestore cerradas no hay sincronización y no deben abrirse reglas generales para un prototipo.
+
+## Preparación de Firestore sin despliegue (2026-11)
+- Se creó `firebase/firestore.rules` con política `deny all` **de referencia**. No se desplegó al proyecto Firebase.
+- `firebase/data-model.md` documenta el modelo previsto con empresas, miembros, roles, catálogo, inventario, comandas, pagos, devoluciones, Caja y auditoría.
+- `firebase/acceptance-tests.md` documenta las pruebas que faltan ejecutar antes de permitir sincronización.
+- Administración muestra el estado real de cada componente; todavía no se ha activado lectura/escritura de Firestore ni migración de datos.
+- La decisión de producción debe incluir seguridad por acción, transacciones e idempotencia, verificación entre dispositivos y costo bajo el plan Spark. El sistema anterior permanece intacto.
