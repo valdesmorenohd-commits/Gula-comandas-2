@@ -24,3 +24,5 @@ export const adjustSaleInventory=wrap(sales.adjustSaleInventory);
 export const cancelSaleOrder=wrap(sales.cancelSaleOrder);
 export const recordSaleRefund=wrap(sales.recordSaleRefund);
 export const recordCashMovement=wrap(sales.recordCashMovement);
+export const previewCashDay=wrap(sales.previewCashDay);
+export const closeCashDay=wrap(sales.closeCashDay);
