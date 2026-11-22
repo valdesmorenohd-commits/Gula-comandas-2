@@ -180,8 +180,10 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   }else if(action==='product'){
    if(u.role!=='principal_admin')throw Error('Solo administración puede modificar el catálogo');
    const id=v(root,'productEdit');
+   const original=products.find(p=>p.id===id);
    const data={name:v(root,'productName'),category:v(root,'productCategory'),
-    price:Number(v(root,'productPrice')),stockMode:v(root,'stockMode'),photoUrl:'',active:true,options:[]};
+    price:Number(v(root,'productPrice')),stockMode:v(root,'stockMode'),
+    photoUrl:original?.photoUrl||'',active:original?.active??true,options:original?.options||[]};
    await once('product',data,key=>id?master.editProduct(getUser(),id,data):master.addProduct(getUser(),data));
   }else if(action==='client'){
    const id=v(root,'clientEdit'),data={name:v(root,'clientName'),phone:v(root,'clientPhone'),notes:v(root,'clientNotes')};
