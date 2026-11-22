@@ -1001,17 +1001,20 @@ function staffPayload(){
   grants:inputs.filter(c=>c.checked&&!defaults.has(c.dataset.firebasePermission)).map(c=>c.dataset.firebasePermission),
   denies:inputs.filter(c=>!c.checked&&defaults.has(c.dataset.firebasePermission)).map(c=>c.dataset.firebasePermission)};
 }
-let confirmingSuspendUid=null;
+let confirmingAccessChange=null;
 function displayFirebaseStaff(){
  const el=$('firebaseStaffList');
  el.innerHTML=staffRows.length?staffRows.map(m=>{
-  const own=m.uid===user?.uid,confirming=confirmingSuspendUid===m.uid,disabled=!m.active;
+  const own=m.uid===user?.uid,action=m.active?'suspend':'reactivate';
+  const confirming=confirmingAccessChange?.uid===m.uid&&confirmingAccessChange.action===action;
+  const label=m.active?'Suspender':'Reactivar';
   const actions=own?'<small>Administrador principal · Cuenta protegida</small>':
     '<button type="button" class="secondary" data-firebase-edit="'+escapeHTML(m.uid)+'">Editar</button>'+
-    '<button type="button" class="secondary" data-firebase-suspend="'+escapeHTML(m.uid)+'" '+(disabled?'disabled':'')+'>'+ (confirming?'Confirmar suspensión':'Suspender')+'</button>'+
-    (confirming?'<button type="button" class="secondary" data-firebase-cancel-suspend="'+escapeHTML(m.uid)+'">Cancelar</button>':'');
-  return '<article class="demo-user-card"><div class="demo-user-info"><b>'+escapeHTML(m.name||'Sin nombre')+'</b><small>'+escapeHTML(m.email||'')+'</small><small>'+escapeHTML(m.roleId||'')+' · '+(m.active?'Activo':'Suspendido')+'</small></div><div class="demo-user-actions">'+actions+'</div>'+
-    '<p class="sub" data-firebase-row-message="'+escapeHTML(m.uid)+'" role="status" aria-live="polite">'+(confirming?'Pulsa «Confirmar suspensión» para desactivar el acceso de esta cuenta a Gula. No elimina Authentication.':'')+'</p></article>';
+    '<button type="button" class="secondary" data-firebase-access="'+escapeHTML(m.uid)+'">'+(confirming?'Confirmar '+label.toLowerCase():label)+'</button>'+
+    (confirming?'<button type="button" class="secondary" data-firebase-cancel-access="'+escapeHTML(m.uid)+'">Cancelar</button>':'');
+  const note=confirming?(m.active?'Confirma que deseas suspender el acceso a Gula.':'Confirma que deseas reactivar el acceso a Gula.'):'';
+  return '<article class="demo-user-card"><div class="demo-user-info"><b>'+escapeHTML(m.name||'Sin nombre')+'</b><small>'+escapeHTML(m.email||'')+'</small><small>'+(m.roleId==='principal_admin'?'Administrador principal':m.roleId==='personal'?'Personal':m.roleId==='consulta'?'Solo consulta':escapeHTML(m.roleId||''))+' · '+(m.active?'Activo':'Suspendido')+'</small></div><div class="demo-user-actions">'+actions+'</div>'+
+    '<p class="sub" data-firebase-row-message="'+escapeHTML(m.uid)+'" role="status" aria-live="polite">'+note+'</p></article>';
  }).join(''):'<p class="muted sub">No hay integrantes vinculados todavía.</p>';
 }
 async function refreshFirebaseStaff(){
@@ -1042,10 +1045,10 @@ $('firebaseStaffSave').addEventListener('click',async()=>{
  finally{button.disabled=false}
 });
 $('firebaseStaffList').addEventListener('click',async e=>{
- const edit=e.target.closest('[data-firebase-edit]'),suspend=e.target.closest('[data-firebase-suspend]'),cancel=e.target.closest('[data-firebase-cancel-suspend]');
- if(cancel){confirmingSuspendUid=null;displayFirebaseStaff();return;}
+ const edit=e.target.closest('[data-firebase-edit]'),change=e.target.closest('[data-firebase-access]'),cancel=e.target.closest('[data-firebase-cancel-access]');
+ if(cancel){confirmingAccessChange=null;displayFirebaseStaff();return;}
  if(edit){
-  confirmingSuspendUid=null;
+  confirmingAccessChange=null;
   const member=staffRows.find(m=>m.uid===edit.dataset.firebaseEdit);
   if(!member||member.uid===user?.uid)return;
   editingStaffUid=member.uid;$('firebaseStaffFormTitle').textContent='Editar · '+member.name;$('firebaseStaffHelp').hidden=true;$('firebaseStaffForm').hidden=false;$('firebaseStaffUid').value=member.uid;$('firebaseStaffUid').readOnly=true;
@@ -1055,24 +1058,28 @@ $('firebaseStaffList').addEventListener('click',async e=>{
   displayFirebaseStaff();
   $('firebaseStaffForm').scrollIntoView({behavior:'smooth',block:'start'});
  }
- if(suspend){
-  const uid=suspend.dataset.firebaseSuspend;
-  const member=staffRows.find(m=>m.uid===uid);
-  if(!member||member.uid===user?.uid||member.active!==true)return;
-  if(confirmingSuspendUid!==uid){confirmingSuspendUid=uid;displayFirebaseStaff();return;}
-  suspend.disabled=true;
-  const rowStatus=suspend.closest('.demo-user-card')?.querySelector('[data-firebase-row-message]');
-  if(rowStatus)rowStatus.textContent='Guardando suspensión en Firebase…';
+ if(change){
+  const uid=change.dataset.firebaseAccess,member=staffRows.find(m=>m.uid===uid);
+  if(!member||member.uid===user?.uid)return;
+  const action=member.active?'suspend':'reactivate';
+  if(confirmingAccessChange?.uid!==uid||confirmingAccessChange.action!==action){
+   confirmingAccessChange={uid,action};displayFirebaseStaff();return;
+  }
+  change.disabled=true;
+  const rowStatus=change.closest('.demo-user-card')?.querySelector('[data-firebase-row-message]');
+  if(rowStatus)rowStatus.textContent='Guardando cambio en Firebase…';
   try{
-   await accessApi.suspend(principalActor(),uid);
-   confirmingSuspendUid=null;
+   const actor=principalActor();
+   if(action==='suspend')await accessApi.suspend(actor,uid);
+   else await accessApi.reactivate(actor,uid);
+   confirmingAccessChange=null;
    await refreshFirebaseStaff();
-   $('firebaseUserStatus').textContent='Acceso suspendido en Firebase. Para reactivar, selecciona Editar y cambia el estado a Activo.';
+   $('firebaseUserStatus').textContent=action==='suspend'?'Acceso suspendido.':'Acceso reactivado.';
   }catch(err){
-   const message='No se pudo suspender: '+(err.code||err.message);
+   const message='No se pudo '+(action==='suspend'?'suspender':'reactivar')+': '+(err.code||err.message);
    if(rowStatus)rowStatus.textContent=message;
    $('firebaseUserStatus').textContent=message;
-   suspend.disabled=false;
+   change.disabled=false;
   }
  }
 });
