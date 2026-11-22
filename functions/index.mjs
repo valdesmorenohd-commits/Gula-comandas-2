@@ -18,6 +18,7 @@ const wrap=(method)=>onCall({region:'southamerica-west1',maxInstances:5},async r
   throw new HttpsError('internal','No se pudo completar la operación');
  }
 });
+export const checkSaleOperation=wrap(sales.checkSaleOperation);
 export const createSaleOrder=wrap(sales.createSaleOrder);
 export const editSaleOrder=wrap(sales.editSaleOrder);
 export const recordSalePayment=wrap(sales.recordSalePayment);
