@@ -14,6 +14,33 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  let products=[],orders=[],clients=[],inventory=[],cash=[],stops=[];
  let active=false,busy=false,selectedOrder=null,selectedProduct=null,cart=[];
  const pending=new Map();
+ const cloudKinds={new:'createSaleOrder',editOrder:'editSaleOrder',payment:'recordSalePayment',
+  adjust:'adjustSaleInventory',cancel:'cancelSaleOrder',closeOrder:'closeSaleOrder',
+  reopenOrder:'reopenSaleOrder',refund:'recordSaleRefund',cash:'recordCashMovement',close:'closeCashDay'};
+ function pendingKey(){return 'gula2_pending_ops_v1_'+(getUser()?.uid||'');}
+ function loadPending(){
+  pending.clear();
+  if(!getUser()?.uid)return;
+  try{
+   const rows=JSON.parse(localStorage.getItem(pendingKey())||'{}');
+   if(rows&&typeof rows==='object'&&!Array.isArray(rows)){
+    for(const [kind,row] of Object.entries(rows)){
+     if(typeof row?.key==='string'&&typeof row?.payload==='string'&&row.payload.length<30000)
+      pending.set(kind,{key:row.key,payload:row.payload});
+    }
+   }
+  }catch{}
+ }
+ function savePending(){
+  if(!getUser()?.uid)return;
+  localStorage.setItem(pendingKey(),JSON.stringify(Object.fromEntries(pending)));
+ }
+ function pendingNotice(){
+  const unresolved=[...pending.keys()];
+  const box=el(root,'pendingNotice');
+  if(box)box.textContent=unresolved.length?
+   'Operación sin confirmar: '+unresolved.join(', ')+'. No cambies sus datos: revisa el historial o reintenta exactamente la misma solicitud.':'';
+ }
  function message(txt,kind=''){
   const e=el(root,'message'); if(e){e.textContent=txt;e.className=kind==='error'?'error':kind==='success'?'success':'muted sub'}
  }
@@ -27,21 +54,39 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   if(write&&u.role==='consulta')throw Error('Tu perfil es de solo consulta');
   return u;
  }
- function once(kind,payload,doWrite){
+ async function once(kind,payload,doWrite){
   if(busy)throw Error('Otra operación sigue en curso');
-  busy=true;
   const stable=JSON.stringify(payload);
   const existing=pending.get(kind);
-  const key=existing?.payload===stable?existing.key:sales.newIdempotencyKey();
-  pending.set(kind,{payload:stable,key});
-  message('Guardando de forma segura en Firebase…');
-  return Promise.resolve().then(()=>doWrite(key)).then(result=>{
-   pending.delete(kind);message('Operación confirmada en Firebase.','success');
+  if(existing&&existing.payload!==stable)
+   throw Error('Hay una operación anterior sin confirmar. Revisa su estado antes de cambiar los datos o importes.');
+  const key=existing?.key||sales.newIdempotencyKey();
+  if(!existing){
+   pending.set(kind,{payload:stable,key});
+   savePending();
+  }
+  pendingNotice();busy=true;
+  message('Verificando y guardando de forma segura en Firebase…');
+  try{
+   // Un reintento puede haber llegado al servidor aunque el iPhone no recibiera la respuesta.
+   if(existing&&cloudKinds[kind]){
+    const status=await sales.checkOperation(cloudKinds[kind],key);
+    if(status.confirmed){
+     pending.delete(kind);savePending();pendingNotice();
+     message('La operación anterior ya estaba registrada. No se ha duplicado.','success');
+     return status.result;
+    }
+   }
+   const result=await doWrite(key);
+   pending.delete(kind);savePending();pendingNotice();
+   message('Operación confirmada en Firebase.','success');
    return result;
-  }).catch(error=>{
-   message('No confirmado: '+(error.message||error.code||error)+'. No repitas la operación hasta comprobar el historial.','error');
+  }catch(error){
+   message('Operación sin confirmar: '+(error.message||error.code||error)+
+    '. Conservamos su identificador para evitar duplicarla.','error');
+   pendingNotice();
    throw error;
-  }).finally(()=>{busy=false});
+  }finally{busy=false}
  }
  function orderStatus(o){return o.status==='closed'?'Cerrada':o.status==='canceled'?'Anulada':o.paymentStatus==='paid'?'Pagada':o.paymentStatus==='partial'?'Abonada':'Pendiente'}
  function drawProducts(){
@@ -138,7 +183,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  function begin(){
   if(active)return;
   try{access()}catch{return}
-  active=true;message('Conectando datos compartidos…');
+  active=true;loadPending();pendingNotice();message('Conectando datos compartidos…');
   const onError=e=>message('No fue posible leer Firebase: '+(e?.code||e?.message||e),'error');
   stops=[
    master.watchProducts(rows=>{products=rows;drawProducts();drawInventory();renderCart()},onError),
