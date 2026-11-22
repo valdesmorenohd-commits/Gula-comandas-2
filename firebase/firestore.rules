@@ -126,7 +126,7 @@ service cloud.firestore {
     // Solo el administrador principal edita los precios y el catálogo.
     function productValid(data,businessId) {
       return data.keys().hasAll(['businessId','name','category','price','active','stockMode','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
-        && data.keys().hasOnly(['businessId','name','category','price','active','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.keys().hasOnly(['businessId','name','category','price','active','stockMode','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
         && data.businessId == businessId
         && data.schemaVersion == 1
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
