@@ -111,14 +111,14 @@ test('administrador puede crear membresía de personal, no una de principal',asy
 test('miembros activos pueden consultar borradores, pero no acceder a caja',async()=>{
  for(const uid of [OWNER,STAFF]){
   const db=env.authenticatedContext(uid).firestore();
-  await assertSucceeds(getDoc(doc(db,'businesses',BUSINESS,'orders','test-order')));
+  await assertSucceeds(getDoc(doc(db,'businesses',BUSINESS,'draftOrders','test-order')));
   await assertFails(getDoc(doc(db,'businesses',BUSINESS,'cashEntries','test-cash')));
  }
 });
 
 test('personal autenticado puede crear solo borrador de comanda pendiente',async()=>{
  const db=env.authenticatedContext(STAFF).firestore();
- const collectionOrders=collection(db,'businesses',BUSINESS,'orders');
+ const collectionOrders=collection(db,'businesses',BUSINESS,'draftOrders');
  const good={
   businessId:BUSINESS,schemaVersion:1,customer:'Cliente ejemplo',
   deliveryDate:'2026-11-23',deliveryWindow:'18:00-20:00',
@@ -132,7 +132,7 @@ test('personal autenticado puede crear solo borrador de comanda pendiente',async
  await assertFails(updateDoc(doc(collectionOrders,'draft-ok'),{paymentStatus:'paid',updatedAt:serverTimestamp()}));
 });
 test('no autenticado o suspendido no crea borradores y no hay operaciones de caja',async()=>{
- const pathOrder=(db,id)=>doc(db,'businesses',BUSINESS,'orders',id);
+ const pathOrder=(db,id)=>doc(db,'businesses',BUSINESS,'draftOrders',id);
  const mock={businessId:BUSINESS,schemaVersion:1,customer:'Ejemplo',deliveryDate:'2026-11-23',
   deliveryWindow:'',items:[{name:'Brownie',qty:1}],notes:'',status:'open',paymentStatus:'pending',
   createdBy:STAFF,updatedBy:STAFF,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
@@ -188,4 +188,12 @@ test('suspendidos no consultan clientes ni productos, y consulta es solo lectura
   businessId:BUSINESS,schemaVersion:1,name:'No autorizado',phone:'',notes:'',
   createdAt:serverTimestamp(),createdBy:'readonly-fixture',updatedAt:serverTimestamp(),updatedBy:'readonly-fixture'
  }));
+});
+
+test('ventas definitivas, pagos, stock y auditoría solo admiten escritura del servidor',async()=>{
+ const db=env.authenticatedContext(OWNER).firestore();
+ await assertFails(setDoc(doc(db,'businesses',BUSINESS,'orders','order-denied'),{name:'Pedido'}));
+ await assertFails(setDoc(doc(db,'businesses',BUSINESS,'inventory','stock-denied'),{quantity:10}));
+ await assertFails(setDoc(doc(db,'businesses',BUSINESS,'cashEntries','cash-denied'),{amount:5000}));
+ await assertFails(setDoc(doc(db,'businesses',BUSINESS,'audit','audit-denied'),{action:'edit'}));
 });
