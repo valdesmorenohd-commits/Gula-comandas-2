@@ -29,3 +29,10 @@ test('permite 80mm y rechaza papel no compatible',()=>{
  assert.match(receiptHtml(order,{widthMm:80}),/80mm/);
  assert.throws(()=>receiptHtml(order,{widthMm:57}));
 });
+
+test('el comprobante identifica la opción del producto y evita scripts en esa opción',()=>{
+ const html=receiptHtml({...order,items:[{...order.items[0],option:'Nutella<script>alert(1)</script>'}]});
+ assert.match(html,/Nutella/);
+ assert.match(html,/&lt;script&gt;/);
+ assert.doesNotMatch(html,/<script>alert/);
+});
