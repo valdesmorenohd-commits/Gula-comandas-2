@@ -171,6 +171,14 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    const result=await once('new',data,key=>sales.createOrder(data,key));
    selectedOrder=result.id;cart=[];renderCart();
    el(root,'selectedOrder').textContent=result.number+' · Guardada';
+  }else if(action==='editOrder'){
+   if(!selectedOrder)throw Error('Selecciona una comanda para editar');
+   if(!cart.length)throw Error('Agrega productos al carrito para reemplazar la selección del pedido');
+   const payload={orderId:selectedOrder,customer:v(root,'customer').trim(),
+    deliveryDate:v(root,'date'),deliveryWindow:v(root,'window'),notes:v(root,'notes'),
+    items:cart.map(line=>({...line}))};
+   await once('editOrder',payload,key=>sales.editOrder(payload.orderId,payload,key));
+   cart=[];renderCart();
   }else if(action==='payment'){
    if(!selectedOrder)throw Error('Primero selecciona una comanda');
    const payload={orderId:selectedOrder,amount:parseAmount('amount'),method:v(root,'method')};
@@ -237,7 +245,19 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    cart.splice(Number(remove.dataset.cloudRemove),1);renderCart();return;
   }
   const print=event.target.closest('[data-cloud-print],[data-cloud-kitchen]');
-  if(order){selectedOrder=order.dataset.cloudOrder;drawOrders();return}
+  if(order){
+   selectedOrder=order.dataset.cloudOrder;
+   const data=orders.find(o=>o.id===selectedOrder);
+   if(data){
+    el(root,'customer').value=data.customer||'';
+    el(root,'date').value=data.deliveryDate||'';
+    el(root,'window').value=data.deliveryWindow||'';
+    el(root,'notes').value=data.notes||'';
+    cart=(data.items||[]).map(i=>({productId:i.productId,option:i.option||'',quantity:i.quantity}));
+    renderCart();
+   }
+   drawOrders();return;
+  }
   if(print){
    const o=orders.find(o=>o.id===(print.dataset.cloudPrint||print.dataset.cloudKitchen));
    if(!o)return;
