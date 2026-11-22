@@ -14,6 +14,8 @@ export function sharedSales(firebaseApp,businessId='gula'){
  const recordPayment=httpsCallable(fn,'recordSalePayment');
  const adjustInventory=httpsCallable(fn,'adjustSaleInventory');
  const cancelOrder=httpsCallable(fn,'cancelSaleOrder');
+ const closeOrder=httpsCallable(fn,'closeSaleOrder');
+ const reopenOrder=httpsCallable(fn,'reopenSaleOrder');
  const recordRefund=httpsCallable(fn,'recordSaleRefund');
  const cashMovement=httpsCallable(fn,'recordCashMovement');
  const previewCash=httpsCallable(fn,'previewCashDay');
@@ -41,6 +43,14 @@ export function sharedSales(firebaseApp,businessId='gula'){
   async cancelOrder(orderId,reason,idempotencyKey){
    if(!idempotencyKey)throw Error('Conserva la clave de anulación hasta recibir respuesta');
    return (await cancelOrder({orderId,reason,idempotencyKey})).data;
+  },
+  async closeOrder(orderId,idempotencyKey){
+   if(!idempotencyKey)throw Error('Conserva la clave del cierre');
+   return (await closeOrder({orderId,idempotencyKey})).data;
+  },
+  async reopenOrder(orderId,reason,idempotencyKey){
+   if(!idempotencyKey)throw Error('Conserva la clave de reapertura');
+   return (await reopenOrder({orderId,reason,idempotencyKey})).data;
   },
   async recordRefund(orderId,amount,method,idempotencyKey){
    if(!idempotencyKey)throw Error('Conserva la clave de devolución hasta recibir respuesta');
