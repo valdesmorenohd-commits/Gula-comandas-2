@@ -184,10 +184,10 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    const data={name:v(root,'productName'),category:v(root,'productCategory'),
     price:Number(v(root,'productPrice')),stockMode:v(root,'stockMode'),
     photoUrl:original?.photoUrl||'',active:original?.active??true,options:original?.options||[]};
-   await once('product',data,key=>id?master.editProduct(getUser(),id,data):master.addProduct(getUser(),data));
+   await once('product',{id,...data},key=>id?master.editProduct(getUser(),id,data):master.addProduct(getUser(),data,key));
   }else if(action==='client'){
    const id=v(root,'clientEdit'),data={name:v(root,'clientName'),phone:v(root,'clientPhone'),notes:v(root,'clientNotes')};
-   await once('client',{id,...data},key=>id?master.editClient(getUser(),id,data):master.addClient(getUser(),data));
+   await once('client',{id,...data},key=>id?master.editClient(getUser(),id,data):master.addClient(getUser(),data,key));
   }else if(action==='preview'){
    const result=await sales.previewCashDay(v(root,'closeDay'),Number(v(root,'openingCash')));
    el(root,'closePreview').textContent=JSON.stringify(result,null,2);
