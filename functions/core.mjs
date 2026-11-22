@@ -73,6 +73,8 @@ function priceFromProduct(product,choice){
   const op=await tx.get(opRef);
   const replay=replayResult(op,payloadFingerprint(data));
   if(replay)return replay;
+  const closedDay=await tx.get(base.collection('cashClosures').doc(input.deliveryDate));
+  if(closedDay.exists)throw Error('No se puede crear una comanda con fecha de entrega cuya caja está cerrada');
   const products=await Promise.all(input.items.map(async line=>{
    const ref=base.collection('products').doc(line.productId);
    const snap=await tx.get(ref);
