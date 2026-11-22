@@ -1,9 +1,60 @@
-// Gula Comandas 2.0 — REGLAS BASE BLOQUEADAS (NO DESPLEGADAS)
-// No habilitar lecturas ni escrituras desde el navegador hasta implementar
-// roles verificados y transacciones compatibles con los invariantes del POS.
+// Gula Comandas 2.0: membresías RESTRINGIDAS, fase de pruebas.
+// NO desplegado. Ningún módulo comercial dispone de lecturas/escrituras.
+// Alta inicial del administrador principal: solo por Firebase Console o
+// entorno privilegiado seguro; jamás desde el navegador.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function loggedIn() {
+      return request.auth != null;
+    }
+    function memberPath(businessId, uid) {
+      return /databases/$(database)/documents/businesses/$(businessId)/members/$(uid);
+    }
+    function isPrincipal(businessId) {
+      return loggedIn()
+        && exists(memberPath(businessId, request.auth.uid))
+        && get(memberPath(businessId, request.auth.uid)).data.active == true
+        && get(memberPath(businessId, request.auth.uid)).data.roleId == 'principal_admin';
+    }
+    function validStaffMember(data, businessId, uid) {
+      return data.keys().hasOnly([
+          'uid', 'businessId', 'name', 'email', 'roleId', 'active',
+          'grants', 'denies', 'updatedAt', 'updatedBy'
+        ])
+        && data.keys().hasAll([
+          'uid', 'businessId', 'name', 'email', 'roleId', 'active',
+          'grants', 'denies', 'updatedAt', 'updatedBy'
+        ])
+        && data.uid == uid
+        && data.businessId == businessId
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
+        && data.email is string && data.email.size() <= 160
+        && data.roleId in ['personal', 'consulta']
+        && data.active is bool
+        && data.grants is list && data.grants.size() <= 15
+        && data.denies is list && data.denies.size() <= 15
+        && data.updatedBy == request.auth.uid
+        && data.updatedAt == request.time;
+    }
+    match /businesses/{businessId}/members/{uid} {
+      allow get: if loggedIn() && (request.auth.uid == uid || isPrincipal(businessId));
+      allow list: if isPrincipal(businessId);
+      // Sólo administrador principal activo; nunca se modifica a sí mismo.
+      // Se prohíbe crear/modificar otros administradores desde la web.
+      allow create: if isPrincipal(businessId)
+        && uid != request.auth.uid
+        && validStaffMember(request.resource.data, businessId, uid);
+      allow update: if isPrincipal(businessId)
+        && uid != request.auth.uid
+        && resource.data.roleId in ['personal','consulta']
+        && validStaffMember(request.resource.data, businessId, uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name','email','roleId','active','grants','denies','updatedAt','updatedBy'
+        ]);
+      allow delete: if false;
+    }
+    // Por ahora TODOS los demás datos siguen bloqueados, incluso con sesión.
     match /{document=**} {
       allow read, write: if false;
     }
