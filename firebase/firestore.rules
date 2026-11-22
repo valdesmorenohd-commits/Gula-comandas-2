@@ -130,13 +130,14 @@ service cloud.firestore {
     // Solo el administrador principal edita los precios y el catálogo.
     function productValid(data,businessId) {
       return data.keys().hasAll(['businessId','name','category','price','active','stockMode','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
-        && data.keys().hasOnly(['businessId','name','category','price','active','stockMode','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.keys().hasOnly(['businessId','name','category','price','options','active','stockMode','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
         && data.businessId == businessId
         && data.schemaVersion == 1
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
         && data.category is string && data.category.size() <= 80
         && data.price is int && data.price >= 0 && data.price <= 10000000
         && data.active is bool
+        && (!data.keys().hasAny(['options']) || (data.options is list && data.options.size() <= 20))
         && data.stockMode in ['permanent','dated']
         && data.photoUrl is string && data.photoUrl.size() <= 500
         && data.createdAt is timestamp
@@ -157,7 +158,7 @@ service cloud.firestore {
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.updatedAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name','category','price','active','stockMode','photoUrl','updatedAt','updatedBy'
+          'name','category','price','options','active','stockMode','photoUrl','updatedAt','updatedBy'
         ]);
       allow delete: if false;
     }
