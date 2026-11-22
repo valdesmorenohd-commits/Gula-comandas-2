@@ -1047,16 +1047,18 @@ $('firebaseStaffList').addEventListener('click',async e=>{
 });
 function showAccessState(result,epoch){
  if(epoch!==authEpoch||!user)return;
+ const accessStateBefore=accessState;
  accessState=result;
  const active=result.status==='active';
+ const alreadyActive=accessStateBefore?.status==='active';
  $('app').hidden=!active;$('accessGate').hidden=active;
  $('firebaseUserPanel').hidden=!(active&&result.membership?.roleId==='principal_admin');
  // El antiguo borrador local permanece oculto para impedir confundirlo con usuarios reales.
  $('demoUserPanel').hidden=true;
  if(active){
   $('accessGateMessage').textContent='';
-  load(user.uid);loadAppearance();loadDemoUsers();loadBirthdayRange();renderTemplates();go('new');
-  if(result.membership.roleId==='principal_admin')refreshFirebaseStaff();
+  if(!alreadyActive){load(user.uid);loadAppearance();loadDemoUsers();loadBirthdayRange();renderTemplates();go('new');}
+  if(result.membership.roleId==='principal_admin'&&!alreadyActive)refreshFirebaseStaff();
  }else{
   state=blank();staffRows=[];displayFirebaseStaff();
   const messages={
