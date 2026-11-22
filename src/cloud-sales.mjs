@@ -10,6 +10,7 @@ export function sharedSales(firebaseApp,businessId='gula'){
  const orders=collection(db,'businesses',businessId,'orders');
  const inventory=collection(db,'businesses',businessId,'inventory');
  const cash=collection(db,'businesses',businessId,'cashEntries');
+ const checkOperation=httpsCallable(fn,'checkSaleOperation');
  const createOrder=httpsCallable(fn,'createSaleOrder');
  const editOrder=httpsCallable(fn,'editSaleOrder');
  const recordPayment=httpsCallable(fn,'recordSalePayment');
@@ -26,6 +27,9 @@ export function sharedSales(firebaseApp,businessId='gula'){
  const key=()=>crypto.randomUUID();
  return {
   newIdempotencyKey:key,
+  async checkOperation(kind,idempotencyKey){
+   return (await checkOperation({kind,idempotencyKey})).data;
+  },
   async createOrder(data,idempotencyKey){
    if(!idempotencyKey)throw Error('Necesitas conservar la clave de la operación');
    const result=await createOrder({...data,idempotencyKey});
