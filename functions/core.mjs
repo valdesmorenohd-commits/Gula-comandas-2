@@ -237,6 +237,20 @@ async function cancelSaleOrder(uid,data){
  });
 }
 
+async function checkSaleOperation(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey);
+ const kind=String(data?.kind||'');
+ const kinds=['createSaleOrder','editSaleOrder','recordSalePayment','adjustSaleInventory',
+  'cancelSaleOrder','closeSaleOrder','reopenSaleOrder','recordSaleRefund','recordCashMovement','closeCashDay'];
+ if(!kinds.includes(kind))throw Error('Tipo de operación inválido');
+ const opRef=operationRef(uid,key,kind);
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'orders.create');
+  const snap=await tx.get(opRef);
+  if(!snap.exists)return {confirmed:false};
+  return {confirmed:true,result:snap.data().result};
+ });
+}
 async function editSaleOrder(uid,data){
  const key=idempotencyKey(data?.idempotencyKey);
  const orderId=cleanDocumentId(data?.orderId,'Comanda'),input=orderInput(data);
@@ -476,5 +490,5 @@ async function closeCashDay(uid,data){
  });
 }
 
- return {createSaleOrder,editSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,closeSaleOrder,reopenSaleOrder,recordSaleRefund,recordCashMovement,previewCashDay,closeCashDay};
+ return {checkSaleOperation,createSaleOrder,editSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,closeSaleOrder,reopenSaleOrder,recordSaleRefund,recordCashMovement,previewCashDay,closeCashDay};
 }
