@@ -1,12 +1,12 @@
 // Núcleo transaccional aislado, apto para comprobarse en emulador sin desplegar Functions.
 import {FieldValue} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
-import {orderInput,paymentInput,adjustmentInput,cancellationInput,refundInput,cashMovementInput,localChileDay,idempotencyKey,inventoryKey,computeTotal} from './validation.mjs';
+import {orderInput,paymentInput,adjustmentInput,cancellationInput,refundInput,cashMovementInput,closingInput,summarizeCashRows,localChileDay,idempotencyKey,inventoryKey,computeTotal} from './validation.mjs';
 export function createSalesCore(db){
  const businessId='gula',base=db.collection('businesses').doc(businessId);
  const forbidden=msg=>{throw new Error(msg)};
  const defaults={
- principal_admin:new Set(['orders.create','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage']),
+ principal_admin:new Set(['orders.create','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage','cash.close']),
  personal:new Set(['orders.create','payments.record','inventory.adjust','cash.manage']),
  consulta:new Set()
 };
@@ -88,11 +88,14 @@ async function recordSalePayment(uid,data){
  const orderId=cleanDocumentId(data?.orderId,'Comanda');
  const {amount,method}=paymentInput(data);
  const orderRef=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'recordSalePayment');
+ const day=localChileDay(),closureRef=base.collection('cashClosures').doc(day);
  const cashRef=base.collection('cashEntries').doc(),auditRef=base.collection('audit').doc();
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'payments.record');
   const op=await tx.get(opRef);
   if(op.exists)return op.data().result;
+  const closure=await tx.get(closureRef);
+  if(closure.exists)throw Error('La caja de hoy está cerrada');
   const snap=await tx.get(orderRef);
   if(!snap.exists)throw Error('Comanda no encontrada');
   const o=snap.data();
@@ -105,7 +108,7 @@ async function recordSalePayment(uid,data){
   const result={orderId,paidTotal,balance,paymentStatus:balance===0?'paid':'partial'};
   tx.update(orderRef,{paidTotal,balance,paymentStatus:result.paymentStatus,
    updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
-  tx.set(cashRef,{businessId,kind:'payment',direction:'in',category:'Pago de comanda',day:localChileDay(),orderId,number:o.number,amount,method,
+  tx.set(cashRef,{businessId,kind:'payment',direction:'in',category:'Pago de comanda',day,orderId,number:o.number,amount,method,
    createdAt:FieldValue.serverTimestamp(),createdBy:uid});
   tx.set(opRef,{uid,kind:'recordSalePayment',result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.payment',uid,orderId,amount,method,at:FieldValue.serverTimestamp()});
@@ -191,11 +194,14 @@ async function recordSaleRefund(uid,data){
  const orderId=cleanDocumentId(data?.orderId,'Comanda');
  const {amount,method}=refundInput(data);
  const orderRef=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'recordSaleRefund');
+ const day=localChileDay(),closureRef=base.collection('cashClosures').doc(day);
  const cashRef=base.collection('cashEntries').doc(),auditRef=base.collection('audit').doc();
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'refunds.record');
   const previous=await tx.get(opRef);
   if(previous.exists)return previous.data().result;
+  const closure=await tx.get(closureRef);
+  if(closure.exists)throw Error('La caja de hoy está cerrada');
   const snap=await tx.get(orderRef);
   if(!snap.exists)throw Error('Comanda inexistente');
   const order=snap.data();
@@ -208,7 +214,7 @@ async function recordSaleRefund(uid,data){
   const result={orderId,refundedTotal,refundDue};
   tx.update(orderRef,{refundedTotal,refundDue,updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
   tx.set(cashRef,{businessId,kind:'refund',direction:'out',category:'Devolución de comanda',
-   day:localChileDay(),orderId,number:order.number,amount,method,createdAt:FieldValue.serverTimestamp(),createdBy:uid});
+   day,orderId,number:order.number,amount,method,createdAt:FieldValue.serverTimestamp(),createdBy:uid});
   tx.set(opRef,{uid,kind:'recordSaleRefund',result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.refund',uid,orderId,amount,method,at:FieldValue.serverTimestamp()});
   return result;
@@ -220,12 +226,15 @@ async function recordCashMovement(uid,data){
  const {direction,category,note,amount,method}=cashMovementInput(data);
  const cashRef=base.collection('cashEntries').doc();
  const opRef=operationRef(uid,key,'recordCashMovement'),auditRef=base.collection('audit').doc();
+ const day=localChileDay(),closureRef=base.collection('cashClosures').doc(day);
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'cash.manage');
   const previous=await tx.get(opRef);
   if(previous.exists)return previous.data().result;
+  const closure=await tx.get(closureRef);
+  if(closure.exists)throw Error('La caja de hoy está cerrada');
   const result={id:cashRef.id,direction,category,amount,method};
-  tx.set(cashRef,{businessId,kind:'manual',direction,category,note,day:localChileDay(),
+  tx.set(cashRef,{businessId,kind:'manual',direction,category,note,day,
    amount,method,createdAt:FieldValue.serverTimestamp(),createdBy:uid});
   tx.set(opRef,{uid,kind:'recordCashMovement',result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'cash.movement',uid,movementId:cashRef.id,direction,category,amount,method,
@@ -234,5 +243,58 @@ async function recordCashMovement(uid,data){
  });
 }
 
- return {createSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,recordSaleRefund,recordCashMovement};
+
+async function cashDaySnapshot(tx,day,openingCash){
+ const cashQuery=base.collection('cashEntries').where('day','==',day).limit(1001);
+ const ordersQuery=base.collection('orders').where('deliveryDate','==',day).limit(1001);
+ const cashSnapshot=await tx.get(cashQuery);
+ const ordersSnapshot=await tx.get(ordersQuery);
+ if(cashSnapshot.size>1000||ordersSnapshot.size>1000)
+  throw Error('Demasiadas operaciones para cerrar este día automáticamente');
+ const movements=cashSnapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
+ const pending=ordersSnapshot.docs.filter(doc=>{
+  const o=doc.data();
+  return o.status==='open'&&Number(o.balance)>0;
+ }).map(doc=>({id:doc.id,number:doc.data().number,customer:doc.data().customer,
+  balance:Number(doc.data().balance)}));
+ const totals=summarizeCashRows(movements,openingCash);
+ return {day,totals,movementCount:movements.length,pendingCount:pending.length,
+   pendingAmount:pending.reduce((sum,o)=>sum+o.balance,0),pending};
+}
+async function previewCashDay(uid,data){
+ const {day,openingCash}=closingInput(data);
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'cash.close');
+  const closure=await tx.get(base.collection('cashClosures').doc(day));
+  if(closure.exists)return {closed:true,...closure.data()};
+  return {closed:false,...await cashDaySnapshot(tx,day,openingCash)};
+ });
+}
+async function closeCashDay(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey);
+ const {day,openingCash,physicalCash,pendingReviewed}=closingInput(data);
+ if(day>localChileDay())throw Error('No puedes cerrar una fecha futura');
+ const closureRef=base.collection('cashClosures').doc(day);
+ const opRef=operationRef(uid,key,'closeCashDay'),auditRef=base.collection('audit').doc();
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'cash.close');
+  const previous=await tx.get(opRef);
+  if(previous.exists)return previous.data().result;
+  const closed=await tx.get(closureRef);
+  if(closed.exists)throw Error('Ese día ya tiene un cierre registrado');
+  const snapshot=await cashDaySnapshot(tx,day,openingCash);
+  if(snapshot.pendingCount>0&&!pendingReviewed)
+   throw Error('Debes revisar las comandas pendientes antes de cerrar caja');
+  const result={day,openingCash,physicalCash,...snapshot,
+   difference:physicalCash===null?null:physicalCash-snapshot.totals.expectedCash};
+  tx.set(closureRef,{...result,closedBy:uid,closedAt:FieldValue.serverTimestamp(),schemaVersion:1});
+  tx.set(opRef,{uid,kind:'closeCashDay',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(auditRef,{kind:'cash.closed',uid,day,pendingCount:snapshot.pendingCount,
+   totalCash:snapshot.totals.cashNet,totalTef:snapshot.totals.tefNet,
+   at:FieldValue.serverTimestamp()});
+  return result;
+ });
+}
+
+ return {createSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,recordSaleRefund,recordCashMovement,previewCashDay,closeCashDay};
 }
