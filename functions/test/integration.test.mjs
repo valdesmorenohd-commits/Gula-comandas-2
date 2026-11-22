@@ -193,3 +193,27 @@ test('rechaza opción inexistente aunque el teléfono envíe un precio inventado
  ]}));
  assert.equal((await base.collection('orders').get()).size,0);
 });
+
+test('misma clave con importes distintos nunca confirma un pago diferente',async()=>{
+ const sale=await service.createSaleOrder(owner,request());
+ const original={orderId:sale.id,idempotencyKey:'payment_fingerprint_123',amount:1000,method:'efectivo'};
+ await service.recordSalePayment(owner,original);
+ await assert.rejects(()=>service.recordSalePayment(owner,{...original,amount:2500}),/misma|clave|otros datos/i);
+ const order=await base.collection('orders').doc(sale.id).get();
+ assert.equal(order.data().paidTotal,1000);
+ assert.equal((await base.collection('cashEntries').get()).size,1);
+});
+test('misma clave con distinta comanda o cantidades nunca reutiliza un resultado falso',async()=>{
+ const input=request('order_fingerprint_123');
+ const first=await service.createSaleOrder(owner,input);
+ await assert.rejects(()=>service.createSaleOrder(owner,{...input,items:[{productId,quantity:3}]}),/clave|otros datos/i);
+ assert.equal((await base.collection('orders').get()).size,1);
+ assert.equal((await base.collection('orders').doc(first.id).get()).data().total,8000);
+ assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,8);
+});
+test('misma clave no permite reutilizar un ajuste de existencias para cantidad distinta',async()=>{
+ const original={productId,delta:2,reason:'Producción del día',idempotencyKey:'inventory_fingerprint_123'};
+ await service.adjustSaleInventory(owner,original);
+ await assert.rejects(()=>service.adjustSaleInventory(owner,{...original,delta:7}),/clave|otros datos/i);
+ assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,12);
+});
