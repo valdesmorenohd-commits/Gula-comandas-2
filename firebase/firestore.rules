@@ -104,6 +104,71 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
       allow update, delete: if false;
     }
+    // Catálogo compartido: las existencias NO se ajustan desde esta colección.
+    // Solo el administrador principal edita los precios y el catálogo.
+    function productValid(data,businessId) {
+      return data.keys().hasAll(['businessId','name','category','price','active','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.keys().hasOnly(['businessId','name','category','price','active','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.businessId == businessId
+        && data.schemaVersion == 1
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.category is string && data.category.size() <= 80
+        && data.price is int && data.price >= 0 && data.price <= 10000000
+        && data.active is bool
+        && data.photoUrl is string && data.photoUrl.size() <= 500
+        && data.createdAt is timestamp
+        && data.createdBy is string
+        && data.updatedAt is timestamp
+        && data.updatedBy == request.auth.uid;
+    }
+    match /businesses/{businessId}/products/{productId} {
+      allow get, list: if activeMember(businessId);
+      allow create: if isPrincipal(businessId)
+        && productValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isPrincipal(businessId)
+        && productValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name','category','price','active','photoUrl','updatedAt','updatedBy'
+        ]);
+      allow delete: if false;
+    }
+    // Clientes compartidos. Los cambios están limitados a personal y principal.
+    function clientValid(data,businessId) {
+      return data.keys().hasAll(['businessId','name','phone','notes','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.keys().hasOnly(['businessId','name','phone','notes','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.businessId == businessId
+        && data.schemaVersion == 1
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 30
+        && data.notes is string && data.notes.size() <= 500
+        && data.createdAt is timestamp
+        && data.createdBy is string
+        && data.updatedAt is timestamp
+        && data.updatedBy == request.auth.uid;
+    }
+    match /businesses/{businessId}/clients/{clientId} {
+      allow get, list: if activeMember(businessId);
+      allow create: if canCreateOrder(businessId)
+        && clientValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if canCreateOrder(businessId)
+        && clientValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name','phone','notes','updatedAt','updatedBy'
+        ]);
+      allow delete: if false;
+    }
     // Las otras colecciones siguen sin acceso. No desplegar hasta validar.
     match /{document=**} {
       allow read, write: if false;
