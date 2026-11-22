@@ -14,8 +14,10 @@ test('todos los identificadores de la interfaz cloud existen en la sección mont
  const ids=[...workspace.matchAll(/(?:el|v)\(root,'([^']+)'\)/g)].map(m=>m[1]);
  for(const id of new Set(ids))assert.ok(cloud.includes('data-cloud="'+id+'"'),'Falta campo '+id);
 });
-test('no se importa ni se fusiona almacenamiento local como ventas compartidas',()=>{
- assert.doesNotMatch(workspace,/localStorage/);
+test('la app guarda solo identificadores pendientes localmente, nunca ventas demo como ventas compartidas',()=>{
+ assert.match(workspace,/gula2_pending_ops_v1_/);
+ assert.match(workspace,/sales\.checkOperation/);
+ assert.doesNotMatch(workspace,/gula2_demo_v1_/);
  assert.doesNotMatch(workspace,/DEMO-/);
  assert.match(workspace,/sales\.createOrder/);
  assert.match(workspace,/sales\.recordPayment/);
@@ -34,4 +36,11 @@ test('productos compartidos pueden editar variantes con recargos',()=>{
 test('creación de productos y clientes reutiliza clave de guardado',()=>{
  assert.match(workspace,/master\.addProduct\(getUser\(\),data,key\)/);
  assert.match(workspace,/master\.addClient\(getUser\(\),data,key\)/);
+});
+
+test('el estado visual advierte las operaciones sin confirmar y evita cambiar importes al reintentar',()=>{
+ assert.match(html,/data-cloud="pendingNotice"/);
+ assert.match(workspace,/existing\.payload!==stable/);
+ assert.match(workspace,/loadPending\(\)/);
+ assert.match(workspace,/savePending\(\)/);
 });
