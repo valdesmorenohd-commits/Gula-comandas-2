@@ -198,3 +198,16 @@ test('ventas definitivas, pagos, stock y auditoría solo admiten escritura del s
  await assertFails(setDoc(doc(db,'businesses',BUSINESS,'cashEntries','cash-denied'),{amount:5000}));
  await assertFails(setDoc(doc(db,'businesses',BUSINESS,'audit','audit-denied'),{action:'edit'}));
 });
+
+test('contadores y operaciones solo son legibles por principal; nadie escribe desde el navegador',async()=>{
+ const ownerDb=env.authenticatedContext(OWNER).firestore();
+ const staffDb=env.authenticatedContext(STAFF).firestore();
+ for(const group of ['counters','operations']){
+  const ownerRef=doc(ownerDb,'businesses',BUSINESS,group,'demo');
+  const staffRef=doc(staffDb,'businesses',BUSINESS,group,'demo');
+  await assertSucceeds(getDoc(ownerRef));
+  await assertFails(getDoc(staffRef));
+  await assertFails(setDoc(ownerRef,{value:123}));
+  await assertFails(setDoc(staffRef,{value:123}));
+ }
+});
