@@ -6,8 +6,8 @@ export function createSalesCore(db){
  const businessId='gula',base=db.collection('businesses').doc(businessId);
  const forbidden=msg=>{throw new Error(msg)};
  const defaults={
- principal_admin:new Set(['orders.create','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage','cash.close']),
- personal:new Set(['orders.create','payments.record','inventory.adjust','cash.manage']),
+ principal_admin:new Set(['orders.create','orders.close','orders.reopen','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage','cash.close']),
+ personal:new Set(['orders.create','orders.close','payments.record','inventory.adjust','cash.manage']),
  consulta:new Set()
 };
 async function memberActor(tx,uid,permission){
@@ -235,6 +235,54 @@ async function cancelSaleOrder(uid,data){
  });
 }
 
+async function closeSaleOrder(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey),orderId=cleanDocumentId(data?.orderId,'Comanda');
+ const orderRef=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'closeSaleOrder');
+ const auditRef=base.collection('audit').doc();
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'orders.close');
+  const previous=await tx.get(opRef);
+  const replay=replayResult(previous,payloadFingerprint(data));
+  if(replay)return replay;
+  const snap=await tx.get(orderRef);
+  if(!snap.exists)throw Error('Comanda no encontrada');
+  const order=snap.data();
+  if(order.status!=='open')throw Error('Solo se pueden cerrar comandas abiertas');
+  if(Number(order.refundDue||0)>0)throw Error('La comanda tiene una devolución pendiente');
+  const result={orderId,status:'closed',number:order.number};
+  tx.update(orderRef,{status:'closed',closedBy:uid,closedAt:FieldValue.serverTimestamp(),
+   updatedBy:uid,updatedAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'closeSaleOrder',payloadFingerprint:payloadFingerprint(data),
+   result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(auditRef,{kind:'order.closed',uid,orderId,number:order.number,at:FieldValue.serverTimestamp()});
+  return result;
+ });
+}
+async function reopenSaleOrder(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey),orderId=cleanDocumentId(data?.orderId,'Comanda');
+ const reason=String(data?.reason||'').trim();
+ if(reason.length<5||reason.length>300)throw Error('Indica un motivo para reabrir la comanda');
+ const orderRef=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'reopenSaleOrder');
+ const auditRef=base.collection('audit').doc();
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'orders.reopen');
+  const previous=await tx.get(opRef);
+  const replay=replayResult(previous,payloadFingerprint(data));
+  if(replay)return replay;
+  const snap=await tx.get(orderRef);
+  if(!snap.exists)throw Error('Comanda no encontrada');
+  const order=snap.data();
+  if(order.status!=='closed')throw Error('Solo se pueden reabrir comandas cerradas');
+  const result={orderId,status:'open',number:order.number};
+  tx.update(orderRef,{status:'open',reopenedBy:uid,reopenedAt:FieldValue.serverTimestamp(),
+   reopenReason:reason,updatedBy:uid,updatedAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'reopenSaleOrder',payloadFingerprint:payloadFingerprint(data),
+   result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(auditRef,{kind:'order.reopened',uid,orderId,reason,number:order.number,
+   at:FieldValue.serverTimestamp()});
+  return result;
+ });
+}
 async function recordSaleRefund(uid,data){
  const key=idempotencyKey(data?.idempotencyKey);
  const orderId=cleanDocumentId(data?.orderId,'Comanda');
@@ -345,5 +393,5 @@ async function closeCashDay(uid,data){
  });
 }
 
- return {createSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,recordSaleRefund,recordCashMovement,previewCashDay,closeCashDay};
+ return {createSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,closeSaleOrder,reopenSaleOrder,recordSaleRefund,recordCashMovement,previewCashDay,closeCashDay};
 }
