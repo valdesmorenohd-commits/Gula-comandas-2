@@ -21,6 +21,7 @@ jobs:
           node --check src/cloud-order-drafts.mjs
           node --check src/cloud-sales.mjs
           node --check src/cloud-workspace.mjs
+          node --check src/cloud-backup.mjs
           node --check src/cloud-receipts.mjs
           node --check functions/index.mjs
           node --check functions/core.mjs
