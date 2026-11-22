@@ -251,3 +251,49 @@ test('una comanda anulada no se puede cerrar ni reabrir',async()=>{
  await assert.rejects(()=>service.closeSaleOrder(owner,{orderId:sale.id,idempotencyKey:'close_cancel_order123'}));
  await assert.rejects(()=>service.reopenSaleOrder(owner,{orderId:sale.id,idempotencyKey:'reopen_cancel_order12',reason:'Revisar anulación anterior'}));
 });
+
+test('editar pedido ajusta existencias sin duplicar reservas y conserva el número',async()=>{
+ const sale=await service.createSaleOrder(owner,request('initial_edit_abcdef'));
+ const edit={...request('edit_stock_original'),orderId:sale.id,
+  items:[{productId,quantity:4}],idempotencyKey:'edit_stock_request123'};
+ const changed=await service.editSaleOrder(staff,edit);
+ assert.equal(changed.number,'G-000001');
+ assert.equal(changed.total,16000);
+ assert.equal(changed.balance,16000);
+ assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,6);
+ assert.deepEqual(await service.editSaleOrder(staff,edit),changed);
+ assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,6);
+ assert.equal((await base.collection('orders').get()).size,1);
+});
+test('edición no permite reducir total por debajo de abonos ni exceder stock',async()=>{
+ const sale=await service.createSaleOrder(owner,request('initial_paid_edit_abc'));
+ await service.recordSalePayment(owner,{orderId:sale.id,amount:6000,method:'tef',
+  idempotencyKey:'paid_edit_abcdef123'});
+ await assert.rejects(()=>service.editSaleOrder(owner,{
+  ...request('reduce_edit_total_12'),orderId:sale.id,
+  items:[{productId,quantity:1}],idempotencyKey:'reduce_edit_abcdef123'
+ }),/abonos/);
+ await assert.rejects(()=>service.editSaleOrder(owner,{
+  ...request('oversell_edit_total'),orderId:sale.id,
+  items:[{productId,quantity:30}],idempotencyKey:'oversell_edit_abcdef'
+ }),/Stock/);
+ assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,8);
+ assert.equal((await base.collection('orders').doc(sale.id).get()).data().total,8000);
+});
+test('edición con nueva fecha cambia inventario por fecha de entrega',async()=>{
+ await base.collection('products').doc(productId).update({stockMode:'dated'});
+ await base.collection('inventory').doc(productId+'__2026-11-23').set({quantity:10});
+ await base.collection('inventory').doc(productId+'__2026-11-24').set({quantity:7});
+ const sale=await service.createSaleOrder(owner,request('dated_first_edit_12'));
+ const changed=await service.editSaleOrder(owner,{...request('dated_second_edit_1'),
+  orderId:sale.id,deliveryDate:'2026-11-24',idempotencyKey:'dated_edit_key_abcdef'});
+ assert.equal(changed.total,8000);
+ assert.equal((await base.collection('inventory').doc(productId+'__2026-11-23').get()).data().quantity,10);
+ assert.equal((await base.collection('inventory').doc(productId+'__2026-11-24').get()).data().quantity,5);
+});
+test('comandas cerradas o anuladas no se pueden editar',async()=>{
+ const sale=await service.createSaleOrder(owner,request('closed_edit_order_abc'));
+ await service.closeSaleOrder(owner,{orderId:sale.id,idempotencyKey:'close_before_edit_123'});
+ await assert.rejects(()=>service.editSaleOrder(owner,{...request('edit_closed_order_1'),
+  orderId:sale.id,idempotencyKey:'edit_closed_order_key'}));
+});
