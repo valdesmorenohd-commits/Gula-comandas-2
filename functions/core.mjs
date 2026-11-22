@@ -25,6 +25,24 @@ function operationRef(uid,key,kind){
  const hash=createHash('sha256').update(uid+':'+kind+':'+key).digest('hex');
  return base.collection('operations').doc(hash);
 }
+function payloadFingerprint(raw){
+ // Una clave de reintento solo es válida para la MISMA solicitud.
+ // Ordenamos las propiedades para que no dependa del orden de un objeto JSON.
+ function canonical(v){
+  if(Array.isArray(v))return v.map(canonical);
+  if(v&&typeof v==='object')return Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])]));
+  return v;
+ }
+ const data={...(raw||{})};
+ delete data.idempotencyKey;
+ return createHash('sha256').update(JSON.stringify(canonical(data))).digest('hex');
+}
+function replayResult(snapshot,fingerprint){
+ if(!snapshot.exists)return null;
+ if(snapshot.data().payloadFingerprint!==fingerprint)
+  throw Error('La clave de solicitud ya se utilizó con otros datos. Revisa el historial antes de continuar');
+ return snapshot.data().result;
+}
 function cleanDocumentId(value,label){
  const v=String(value||'');
  if(!/^[A-Za-z0-9_-]{8,128}$/.test(v))throw Error(label+' inválido');
@@ -53,7 +71,8 @@ function priceFromProduct(product,choice){
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'orders.create');
   const op=await tx.get(opRef);
-  if(op.exists)return op.data().result;
+  const replay=replayResult(op,payloadFingerprint(data));
+  if(replay)return replay;
   const products=await Promise.all(input.items.map(async line=>{
    const ref=base.collection('products').doc(line.productId);
    const snap=await tx.get(ref);
@@ -95,7 +114,7 @@ function priceFromProduct(product,choice){
    items:products.map(p=>({productId:p.productId,name:p.name,option:p.option,quantity:p.quantity,price:p.price,stockMode:p.stockMode})),
    total,paidTotal:0,refundedTotal:0,refundDue:0,balance:total,paymentStatus:'pending',status:'open',
    createdBy:uid,updatedBy:uid,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
-  tx.set(opRef,{uid,kind:'createSaleOrder',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'createSaleOrder',payloadFingerprint:payloadFingerprint(data),result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.created',uid,orderId:orderRef.id,number,total,at:FieldValue.serverTimestamp()});
   return result;
  });
@@ -111,7 +130,8 @@ async function recordSalePayment(uid,data){
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'payments.record');
   const op=await tx.get(opRef);
-  if(op.exists)return op.data().result;
+  const replay=replayResult(op,payloadFingerprint(data));
+  if(replay)return replay;
   const closure=await tx.get(closureRef);
   if(closure.exists)throw Error('La caja de hoy está cerrada');
   const snap=await tx.get(orderRef);
@@ -128,7 +148,7 @@ async function recordSalePayment(uid,data){
    updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
   tx.set(cashRef,{businessId,kind:'payment',direction:'in',category:'Pago de comanda',day,orderId,number:o.number,amount,method,
    createdAt:FieldValue.serverTimestamp(),createdBy:uid});
-  tx.set(opRef,{uid,kind:'recordSalePayment',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'recordSalePayment',payloadFingerprint:payloadFingerprint(data),result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.payment',uid,orderId,amount,method,at:FieldValue.serverTimestamp()});
   return result;
  });
@@ -142,7 +162,8 @@ async function adjustSaleInventory(uid,data){
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'inventory.adjust');
   const op=await tx.get(opRef);
-  if(op.exists)return op.data().result;
+  const replay=replayResult(op,payloadFingerprint(data));
+  if(replay)return replay;
   const productSnap=await tx.get(productRef);
   if(!productSnap.exists)throw Error('Producto inexistente');
   const mode=productSnap.data().stockMode==='dated'?'dated':'permanent';
@@ -155,7 +176,7 @@ async function adjustSaleInventory(uid,data){
   const result={productId,inventoryId,previous:prior,quantity:next};
   tx.set(ref,{businessId,productId,stockMode:mode,stockDate:mode==='dated'?date:null,quantity:next,
    updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
-  tx.set(opRef,{uid,kind:'adjustSaleInventory',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'adjustSaleInventory',payloadFingerprint:payloadFingerprint(data),result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'inventory.adjusted',uid,productId,inventoryId,previous:prior,quantity:next,delta,reason,
    at:FieldValue.serverTimestamp()});
   return result;
@@ -171,7 +192,8 @@ async function cancelSaleOrder(uid,data){
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'orders.cancel');
   const existing=await tx.get(opRef);
-  if(existing.exists)return existing.data().result;
+  const replay=replayResult(existing,payloadFingerprint(data));
+  if(replay)return replay;
   const snap=await tx.get(ref);
   if(!snap.exists)throw Error('Comanda inexistente');
   const order=snap.data();
@@ -206,7 +228,7 @@ async function cancelSaleOrder(uid,data){
   tx.update(ref,{status:'canceled',cancelReason:reason,canceledBy:uid,canceledAt:FieldValue.serverTimestamp(),
    refundDue,balance:0,updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
   const result={orderId,status:'canceled',refundDue,restoredStock:true};
-  tx.set(opRef,{uid,kind:'cancelSaleOrder',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'cancelSaleOrder',payloadFingerprint:payloadFingerprint(data),result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.canceled',uid,orderId,number:order.number,reason,refundDue,
    at:FieldValue.serverTimestamp()});
   return result;
@@ -223,7 +245,8 @@ async function recordSaleRefund(uid,data){
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'refunds.record');
   const previous=await tx.get(opRef);
-  if(previous.exists)return previous.data().result;
+  const replay=replayResult(previous,payloadFingerprint(data));
+  if(replay)return replay;
   const closure=await tx.get(closureRef);
   if(closure.exists)throw Error('La caja de hoy está cerrada');
   const snap=await tx.get(orderRef);
@@ -239,7 +262,7 @@ async function recordSaleRefund(uid,data){
   tx.update(orderRef,{refundedTotal,refundDue,updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
   tx.set(cashRef,{businessId,kind:'refund',direction:'out',category:'Devolución de comanda',
    day,orderId,number:order.number,amount,method,createdAt:FieldValue.serverTimestamp(),createdBy:uid});
-  tx.set(opRef,{uid,kind:'recordSaleRefund',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'recordSaleRefund',payloadFingerprint:payloadFingerprint(data),result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.refund',uid,orderId,amount,method,at:FieldValue.serverTimestamp()});
   return result;
  });
@@ -254,13 +277,14 @@ async function recordCashMovement(uid,data){
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'cash.manage');
   const previous=await tx.get(opRef);
-  if(previous.exists)return previous.data().result;
+  const replay=replayResult(previous,payloadFingerprint(data));
+  if(replay)return replay;
   const closure=await tx.get(closureRef);
   if(closure.exists)throw Error('La caja de hoy está cerrada');
   const result={id:cashRef.id,direction,category,amount,method};
   tx.set(cashRef,{businessId,kind:'manual',direction,category,note,day,
    amount,method,createdAt:FieldValue.serverTimestamp(),createdBy:uid});
-  tx.set(opRef,{uid,kind:'recordCashMovement',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'recordCashMovement',payloadFingerprint:payloadFingerprint(data),result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'cash.movement',uid,movementId:cashRef.id,direction,category,amount,method,
    at:FieldValue.serverTimestamp()});
   return result;
@@ -303,7 +327,8 @@ async function closeCashDay(uid,data){
  return db.runTransaction(async tx=>{
   await memberActor(tx,uid,'cash.close');
   const previous=await tx.get(opRef);
-  if(previous.exists)return previous.data().result;
+  const replay=replayResult(previous,payloadFingerprint(data));
+  if(replay)return replay;
   const closed=await tx.get(closureRef);
   if(closed.exists)throw Error('Ese día ya tiene un cierre registrado');
   const snapshot=await cashDaySnapshot(tx,day,openingCash);
@@ -312,7 +337,7 @@ async function closeCashDay(uid,data){
   const result={day,openingCash,physicalCash,...snapshot,
    difference:physicalCash===null?null:physicalCash-snapshot.totals.expectedCash};
   tx.set(closureRef,{...result,closedBy:uid,closedAt:FieldValue.serverTimestamp(),schemaVersion:1});
-  tx.set(opRef,{uid,kind:'closeCashDay',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(opRef,{uid,kind:'closeCashDay',payloadFingerprint:payloadFingerprint(data),result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'cash.closed',uid,day,pendingCount:snapshot.pendingCount,
    totalCash:snapshot.totals.cashNet,totalTef:snapshot.totals.tefNet,
    at:FieldValue.serverTimestamp()});
