@@ -204,9 +204,34 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   const n=Number(v(root,id));if(!Number.isSafeInteger(n)||n<=0)throw Error('Monto inválido');
   return n;
  }
+ async function checkAllPending(){
+  if(busy)throw Error('Otra operación está en curso');
+  const relevant=[...pending.entries()].filter(([kind])=>cloudKinds[kind]);
+  if(!relevant.length){message('No hay pagos ni comandas pendientes de confirmar.','success');return}
+  busy=true;
+  let confirmed=0,unconfirmed=0,unavailable=0;
+  try{
+   for(const [kind,row] of relevant){
+    try{
+     const status=await sales.checkOperation(cloudKinds[kind],row.key);
+     if(status.confirmed){pending.delete(kind);confirmed++}
+     else unconfirmed++;
+    }catch(error){unavailable++}
+   }
+   savePending();pendingNotice();
+   if(unavailable)message('Se confirmaron '+confirmed+' operaciones. '+unavailable+
+    ' no pudieron consultarse; no repitas esos cobros hasta recuperar la conexión.','error');
+   else if(unconfirmed)message('Confirmadas: '+confirmed+'. Sin registrar: '+unconfirmed+
+    '. Puedes reintentar con la misma solicitud, sin cambiar importes.','error');
+   else message('Operaciones verificadas: '+confirmed+' confirmadas. No se ha repetido ningún cobro.','success');
+  }finally{busy=false}
+ }
  async function perform(action){
   if(!active)throw Error('El módulo compartido aún no está conectado');
   const u=permission(action!=='print');
+  if(action==='checkPending'){
+   await checkAllPending();return;
+  }
   if(action==='addLine'){
    addCartLine();return;
   }
