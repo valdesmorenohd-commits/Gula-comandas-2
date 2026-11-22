@@ -122,6 +122,10 @@ service cloud.firestore {
       allow get, list: if isPrincipal(businessId);
       allow create, update, delete: if false;
     }
+    match /businesses/{businessId}/cashClosures/{day} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
     // Catálogo compartido: las existencias NO se ajustan desde esta colección.
     // Solo el administrador principal edita los precios y el catálogo.
     function productValid(data,businessId) {
