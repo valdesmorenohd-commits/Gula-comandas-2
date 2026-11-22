@@ -3,6 +3,7 @@
 import {sharedSales} from './cloud-sales.mjs';
 import {sharedMasterData} from './cloud-master-data.mjs';
 import {openReceiptPrint} from './cloud-receipts.mjs';
+import {downloadSharedBackup} from './cloud-backup.mjs';
 const safe=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const clp=v=>'$'+Number(v||0).toLocaleString('es-CL');
 const el=(root,id)=>root.querySelector('[data-cloud="'+id+'"]');
@@ -189,6 +190,10 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    const result=await sales.previewCashDay(v(root,'closeDay'),Number(v(root,'openingCash')));
    el(root,'closePreview').textContent=JSON.stringify(result,null,2);
    message('Previsualización de caja disponible.');
+  }else if(action==='backup'){
+   if(u.role!=='principal_admin')throw Error('Solo administración puede exportar el respaldo');
+   const result=await downloadSharedBackup(firebaseApp,{uid:u.uid,principal:true});
+   message('Respaldo generado: '+Object.values(result.counts).reduce((n,x)=>n+x,0)+' registros. Guarda el archivo en un lugar privado.','success');
   }else if(action==='close'){
    if(u.role!=='principal_admin')throw Error('Solo administración puede cerrar caja');
    const data={day:v(root,'closeDay'),openingCash:Number(v(root,'openingCash')),
