@@ -297,3 +297,13 @@ test('comandas cerradas o anuladas no se pueden editar',async()=>{
  await assert.rejects(()=>service.editSaleOrder(owner,{...request('edit_closed_order_1'),
   orderId:sale.id,idempotencyKey:'edit_closed_order_key'}));
 });
+
+test('no se permiten nuevas comandas ni ediciones con un día de entrega cerrado',async()=>{
+ const day='2026-11-23';
+ const sale=await service.createSaleOrder(owner,request('order_before_closed_day'));
+ await base.collection('cashClosures').doc(day).set({day,closedBy:owner});
+ await assert.rejects(()=>service.createSaleOrder(owner,request('order_after_closed_day')),/caja está cerrada/);
+ await assert.rejects(()=>service.editSaleOrder(owner,{...request('edit_after_closed_day'),orderId:sale.id,
+  idempotencyKey:'edit_after_day_closed'}),/caja cerrada/);
+ assert.equal((await base.collection('orders').get()).size,1);
+});
