@@ -1,6 +1,6 @@
 // Gula Comandas 2.0: acceso compartido a Productos y Clientes.
 // Etapa preparatoria: no convierte la app local en un sistema de ventas real.
-import {getFirestore,collection,doc,addDoc,updateDoc,getDocs,onSnapshot,
+import {getFirestore,collection,doc,getDoc,setDoc,updateDoc,getDocs,onSnapshot,
   query,orderBy,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 function textValue(value,max,label,{required=false}={}){
@@ -48,6 +48,34 @@ export function sharedMasterData(firebaseApp,businessId='gula'){
   return actor.uid;
  };
  const readSnapshot=snapshot=>snapshot.docs.map(d=>({id:d.id,...d.data()}));
+ const createOnce=async (collectionRef,uid,payload,idempotencyKey)=>{
+  const id=String(idempotencyKey||'');
+  if(!/^[A-Za-z0-9_-]{12,80}$/.test(id))throw Error('Falta clave única de creación');
+  const ref=doc(collectionRef,id);
+  const current=await getDoc(ref);
+  if(current.exists()){
+   const record=current.data();
+   const same=Object.entries(payload).every(([k,v])=>JSON.stringify(record[k])===JSON.stringify(v));
+   if(record.createdBy!==uid||!same)throw Error('La clave de creación ya pertenece a otro registro');
+   return id;
+  }
+  try{
+   await setDoc(ref,{businessId,schemaVersion:1,...payload,
+     createdAt:serverTimestamp(),createdBy:uid,updatedAt:serverTimestamp(),updatedBy:uid});
+   return id;
+  }catch(error){
+   // Una respuesta ambigua no autoriza repetir una creación con otro ID.
+   // Consultar la misma referencia y confirmar contenido si el servidor llegó a guardar.
+   try{
+    const committed=await getDoc(ref);
+    const same=committed.exists()&&committed.data().createdBy===uid&&
+     Object.entries(payload).every(([k,v])=>JSON.stringify(committed.data()[k])===JSON.stringify(v));
+    if(same)return id;
+   }catch{}
+   throw error;
+  }
+ };
+
  return {
   async listProducts(){
    return readSnapshot(await getDocs(query(products,orderBy('name'))));
@@ -55,12 +83,9 @@ export function sharedMasterData(firebaseApp,businessId='gula'){
   watchProducts(onData,onError){
    return onSnapshot(query(products,orderBy('name')),snap=>onData(readSnapshot(snap)),onError);
   },
-  async addProduct(actor,data){
+  async addProduct(actor,data,idempotencyKey){
    const uid=actorUid(actor);
-   const payload=validateProduct(data);
-   const result=await addDoc(products,{businessId,schemaVersion:1,...payload,
-     createdAt:serverTimestamp(),createdBy:uid,updatedAt:serverTimestamp(),updatedBy:uid});
-   return result.id;
+   return createOnce(products,uid,validateProduct(data),idempotencyKey);
   },
   async editProduct(actor,id,data){
    const uid=actorUid(actor);
@@ -73,11 +98,9 @@ export function sharedMasterData(firebaseApp,businessId='gula'){
   watchClients(onData,onError){
    return onSnapshot(query(clients,orderBy('name')),snap=>onData(readSnapshot(snap)),onError);
   },
-  async addClient(actor,data){
+  async addClient(actor,data,idempotencyKey){
    const uid=actorUid(actor);
-   const result=await addDoc(clients,{businessId,schemaVersion:1,...validateClient(data),
-     createdAt:serverTimestamp(),createdBy:uid,updatedAt:serverTimestamp(),updatedBy:uid});
-   return result.id;
+   return createOnce(clients,uid,validateClient(data),idempotencyKey);
   },
   async editClient(actor,id,data){
    const uid=actorUid(actor);
