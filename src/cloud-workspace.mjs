@@ -43,7 +43,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    throw error;
   }).finally(()=>{busy=false});
  }
- function orderStatus(o){return o.status==='canceled'?'Anulada':o.paymentStatus==='paid'?'Pagada':o.paymentStatus==='partial'?'Abonada':'Pendiente'}
+ function orderStatus(o){return o.status==='closed'?'Cerrada':o.status==='canceled'?'Anulada':o.paymentStatus==='paid'?'Pagada':o.paymentStatus==='partial'?'Abonada':'Pendiente'}
  function drawProducts(){
   const option=el(root,'product');
   const choice=v(root,'product'),start=option?.value;
@@ -175,6 +175,15 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    if(!selectedOrder)throw Error('Primero selecciona una comanda');
    const payload={orderId:selectedOrder,amount:parseAmount('amount'),method:v(root,'method')};
    await once('payment',payload,key=>sales.recordPayment(payload.orderId,payload.amount,payload.method,key));
+  }else if(action==='closeOrder'){
+   if(!selectedOrder)throw Error('Selecciona una comanda');
+   const payload={orderId:selectedOrder};
+   await once('closeOrder',payload,key=>sales.closeOrder(payload.orderId,key));
+  }else if(action==='reopenOrder'){
+   if(!selectedOrder)throw Error('Selecciona una comanda');
+   if(u.role!=='principal_admin')throw Error('Solo administración puede reabrir comandas');
+   const payload={orderId:selectedOrder,reason:v(root,'reopenReason')};
+   await once('reopenOrder',payload,key=>sales.reopenOrder(payload.orderId,payload.reason,key));
   }else if(action==='cancel'){
    if(!selectedOrder)throw Error('Selecciona una comanda');
    if(u.role!=='principal_admin')throw Error('Solo administración puede anular comandas');
