@@ -217,3 +217,37 @@ test('misma clave no permite reutilizar un ajuste de existencias para cantidad d
  await assert.rejects(()=>service.adjustSaleInventory(owner,{...original,delta:7}),/clave|otros datos/i);
  assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,12);
 });
+
+test('personal puede cerrar una comanda y no cobrar después del cierre',async()=>{
+ const sale=await service.createSaleOrder(owner,request('close_order_request_123'));
+ const input={orderId:sale.id,idempotencyKey:'close_order_abcdef123'};
+ const result=await service.closeSaleOrder(staff,input);
+ assert.equal(result.status,'closed');
+ assert.deepEqual(await service.closeSaleOrder(staff,input),result);
+ await assert.rejects(()=>service.closeSaleOrder(staff,{...input,idempotencyKey:'close_order_another12'}));
+ await assert.rejects(()=>service.recordSalePayment(owner,{
+  orderId:sale.id,idempotencyKey:'payment_closed_order1',amount:1000,method:'efectivo'
+ }));
+ assert.equal((await base.collection('audit').where('kind','==','order.closed').get()).size,1);
+});
+test('solo administrador reabre comandas y deja motivo auditado',async()=>{
+ const sale=await service.createSaleOrder(owner,request('reopen_order_request_1'));
+ await service.closeSaleOrder(staff,{orderId:sale.id,idempotencyKey:'close_order_other123'});
+ const payload={orderId:sale.id,reason:'El cliente solicitó un cambio',idempotencyKey:'reopen_order_admin123'};
+ await assert.rejects(()=>service.reopenSaleOrder(staff,payload),/permiso|perfil/);
+ await assert.rejects(()=>service.reopenSaleOrder(owner,{...payload,reason:'no'}),/motivo/);
+ const result=await service.reopenSaleOrder(owner,payload);
+ assert.equal(result.status,'open');
+ assert.deepEqual(await service.reopenSaleOrder(owner,payload),result);
+ assert.equal((await base.collection('audit').where('kind','==','order.reopened').get()).size,1);
+ await assert.rejects(()=>service.reopenSaleOrder(owner,{...payload,idempotencyKey:'reopen_second_try123'}));
+ const payment=await service.recordSalePayment(owner,{orderId:sale.id,
+  idempotencyKey:'payment_after_reopen1',amount:1000,method:'tef'});
+ assert.equal(payment.paidTotal,1000);
+});
+test('una comanda anulada no se puede cerrar ni reabrir',async()=>{
+ const sale=await service.createSaleOrder(owner,request('cancel_then_close_123'));
+ await service.cancelSaleOrder(owner,{orderId:sale.id,idempotencyKey:'cancel_then_close_123',reason:'Cliente canceló definitivamente'});
+ await assert.rejects(()=>service.closeSaleOrder(owner,{orderId:sale.id,idempotencyKey:'close_cancel_order123'}));
+ await assert.rejects(()=>service.reopenSaleOrder(owner,{orderId:sale.id,idempotencyKey:'reopen_cancel_order12',reason:'Revisar anulación anterior'}));
+});
