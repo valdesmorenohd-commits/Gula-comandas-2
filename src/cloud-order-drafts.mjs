@@ -5,7 +5,7 @@ import {getFirestore,collection,doc,addDoc,getDocs,query,orderBy,serverTimestamp
 export function cloudOrderDrafts(firebaseApp,businessId='gula'){
   if(businessId!=='gula')throw Error('Negocio no autorizado');
   const db=getFirestore(firebaseApp);
-  const orders=collection(db,'businesses',businessId,'orders');
+  const orders=collection(db,'businesses',businessId,'draftOrders');
   function normalized(draft){
     const customer=String(draft?.customer||'').trim(),deliveryDate=String(draft?.deliveryDate||''),deliveryWindow=String(draft?.deliveryWindow||'').slice(0,100),
     notes=String(draft?.notes||'').slice(0,1500);
