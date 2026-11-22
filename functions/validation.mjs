@@ -81,3 +81,27 @@ export function validateBusinessDate(value){
 export function localChileDay(date=new Date()){
  return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
 }
+
+export function closingInput(raw){
+ const day=validateBusinessDate(raw?.day);
+ const openingCash=Number(raw?.openingCash);
+ const physicalCash=raw?.physicalCash===undefined||raw?.physicalCash===null||raw?.physicalCash===''?null:Number(raw.physicalCash);
+ if(!Number.isSafeInteger(openingCash)||openingCash<0||openingCash>100000000)
+  throw Error('Saldo inicial de efectivo inválido');
+ if(physicalCash!==null&&(!Number.isSafeInteger(physicalCash)||physicalCash<0||physicalCash>100000000))
+  throw Error('Efectivo contado inválido');
+ return {day,openingCash,physicalCash,pendingReviewed:raw?.pendingReviewed===true};
+}
+export function summarizeCashRows(entries,openingCash=0){
+ const totals={cashIn:0,cashOut:0,tefIn:0,tefOut:0};
+ for(const entry of entries){
+  const amount=Number(entry.amount),method=entry.method,direction=entry.direction;
+  if(!Number.isSafeInteger(amount)||amount<=0||!['efectivo','tef'].includes(method)||!['in','out'].includes(direction))
+   throw Error('Hay un movimiento de caja inválido');
+  const key=(method==='efectivo'?'cash':'tef')+(direction==='in'?'In':'Out');
+  totals[key]+=amount;
+  if(!Number.isSafeInteger(totals[key]))throw Error('Monto de caja fuera de rango');
+ }
+ return {...totals,cashNet:totals.cashIn-totals.cashOut,tefNet:totals.tefIn-totals.tefOut,
+   expectedCash:openingCash+totals.cashIn-totals.cashOut};
+}
