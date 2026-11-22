@@ -6,8 +6,8 @@ export function createSalesCore(db){
  const businessId='gula',base=db.collection('businesses').doc(businessId);
  const forbidden=msg=>{throw new Error(msg)};
  const defaults={
- principal_admin:new Set(['orders.create','orders.close','orders.reopen','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage','cash.close']),
- personal:new Set(['orders.create','orders.close','payments.record','inventory.adjust','cash.manage']),
+ principal_admin:new Set(['orders.create','orders.edit','orders.close','orders.reopen','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage','cash.close']),
+ personal:new Set(['orders.create','orders.edit','orders.close','payments.record','inventory.adjust','cash.manage']),
  consulta:new Set()
 };
 async function memberActor(tx,uid,permission){
@@ -235,6 +235,87 @@ async function cancelSaleOrder(uid,data){
  });
 }
 
+async function editSaleOrder(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey);
+ const orderId=cleanDocumentId(data?.orderId,'Comanda'),input=orderInput(data);
+ const orderRef=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'editSaleOrder');
+ const auditRef=base.collection('audit').doc();
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'orders.edit');
+  const previous=await tx.get(opRef);
+  const replay=replayResult(previous,payloadFingerprint(data));
+  if(replay)return replay;
+  const current=await tx.get(orderRef);
+  if(!current.exists)throw Error('Comanda no encontrada');
+  const before=current.data();
+  if(before.status!=='open')throw Error('Solo se pueden editar comandas abiertas');
+  if(!Array.isArray(before.items)||before.items.length<1)throw Error('Comanda sin productos válidos');
+
+  // El cierre de caja congela los pedidos asociados al día de entrega.
+  for(const day of new Set([before.deliveryDate,input.deliveryDate])){
+   const close=await tx.get(base.collection('cashClosures').doc(day));
+   if(close.exists)throw Error('Hay una caja cerrada para una fecha de entrega');
+  }
+
+  const products=[];
+  for(const line of input.items){
+   const productRef=base.collection('products').doc(line.productId);
+   const productSnap=await tx.get(productRef);
+   if(!productSnap.exists||productSnap.data().active!==true)
+    throw Error('El producto seleccionado ya no está disponible');
+   const product=productSnap.data();
+   products.push({...line,name:product.name,price:priceFromProduct(product,line.option),
+    stockMode:product.stockMode==='dated'?'dated':'permanent'});
+  }
+  const targetTotal=computeTotal(products),paid=Number(before.paidTotal||0);
+  if(!Number.isSafeInteger(paid)||paid<0||paid>Number(before.total))
+   throw Error('Importes anteriores inconsistentes');
+  if(targetTotal<paid)throw Error('El nuevo total es inferior a los abonos registrados');
+
+  // Reservas: devolver unidades anteriores y descontar las nuevas,
+  // agrupando todas las variantes del mismo producto y fecha.
+  const delta=new Map();
+  function change(productId,deliveryDate,mode,amount){
+   const id=inventoryKey(productId,deliveryDate,mode);
+   delta.set(id,(delta.get(id)||0)+amount);
+  }
+  for(const item of before.items){
+   if(!Number.isSafeInteger(item.quantity)||item.quantity<1)
+    throw Error('Cantidad anterior inválida');
+   change(item.productId,before.deliveryDate,item.stockMode,item.quantity);
+  }
+  for(const item of products)change(item.productId,input.deliveryDate,item.stockMode,-item.quantity);
+
+  const changes=[];
+  for(const [id,difference] of delta){
+   if(!difference)continue;
+   const ref=base.collection('inventory').doc(id),snap=await tx.get(ref);
+   if(!snap.exists)throw Error('No se encontró stock configurado para un producto');
+   const currentQty=Number(snap.data().quantity),next=currentQty+difference;
+   if(!Number.isSafeInteger(currentQty)||currentQty<0||!Number.isSafeInteger(next)||next<0||next>100000)
+    throw Error('Stock insuficiente para editar la comanda');
+   changes.push({ref,next});
+  }
+  const balance=targetTotal-paid;
+  const paymentStatus=paid===0?'pending':balance===0?'paid':'partial';
+  for(const change of changes){
+   tx.update(change.ref,{quantity:change.next,updatedBy:uid,
+    updatedAt:FieldValue.serverTimestamp()});
+  }
+  tx.update(orderRef,{customer:input.customer,deliveryDate:input.deliveryDate,
+   deliveryWindow:input.deliveryWindow,notes:input.notes,total:targetTotal,
+   items:products.map(p=>({productId:p.productId,name:p.name,option:p.option,
+    quantity:p.quantity,price:p.price,stockMode:p.stockMode})),
+   balance,paymentStatus,updatedBy:uid,updatedAt:FieldValue.serverTimestamp()});
+  const result={orderId,number:before.number,total:targetTotal,paidTotal:paid,balance,paymentStatus};
+  tx.set(opRef,{uid,kind:'editSaleOrder',payloadFingerprint:payloadFingerprint(data),
+   result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(auditRef,{kind:'order.edited',uid,orderId,number:before.number,
+   oldTotal:before.total,newTotal:targetTotal,at:FieldValue.serverTimestamp()});
+  return result;
+ });
+}
+
 async function closeSaleOrder(uid,data){
  const key=idempotencyKey(data?.idempotencyKey),orderId=cleanDocumentId(data?.orderId,'Comanda');
  const orderRef=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'closeSaleOrder');
@@ -393,5 +474,5 @@ async function closeCashDay(uid,data){
  });
 }
 
- return {createSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,closeSaleOrder,reopenSaleOrder,recordSaleRefund,recordCashMovement,previewCashDay,closeCashDay};
+ return {createSaleOrder,editSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,closeSaleOrder,reopenSaleOrder,recordSaleRefund,recordCashMovement,previewCashDay,closeCashDay};
 }
