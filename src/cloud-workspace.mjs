@@ -109,6 +109,22 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   const cashSum=cash.reduce((n,m)=>n+(m.direction==='in'?1:-1)*Number(m.amount||0),0);
   el(root,'cashTotal').textContent='Movimiento neto consultado: '+clp(cashSum);
  }
+ function parseProductOptions(raw){
+  const rows=String(raw||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+  if(rows.length>20)throw Error('Máximo 20 opciones por producto');
+  const seen=new Set();
+  return rows.map(row=>{
+   const parts=row.split('|');
+   if(parts.length!==2)throw Error('Cada opción debe tener formato Nombre|recargo');
+   const name=parts[0].trim(),extraRaw=parts[1].trim(),extra=Number(extraRaw);
+   if(!name||name.length>80||!/^[0-9]+$/.test(extraRaw)||!Number.isSafeInteger(extra)||extra>1000000)
+    throw Error('Nombre o recargo de opción inválidos');
+   const key=name.toLocaleLowerCase('es-CL');
+   if(seen.has(key))throw Error('Hay opciones duplicadas');
+   seen.add(key);
+   return {name,extra};
+  });
+ }
  function drawClients(){
   const c=v(root,'clientEdit');
   el(root,'clientEdit').innerHTML='<option value="">Nuevo cliente</option>'+clients.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
@@ -183,7 +199,8 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    const original=products.find(p=>p.id===id);
    const data={name:v(root,'productName'),category:v(root,'productCategory'),
     price:Number(v(root,'productPrice')),stockMode:v(root,'stockMode'),
-    photoUrl:original?.photoUrl||'',active:original?.active??true,options:original?.options||[]};
+    photoUrl:original?.photoUrl||'',active:original?.active??true,
+    options:parseProductOptions(v(root,'productOptions'))};
    await once('product',{id,...data},key=>id?master.editProduct(getUser(),id,data):master.addProduct(getUser(),data,key));
   }else if(action==='client'){
    const id=v(root,'clientEdit'),data={name:v(root,'clientName'),phone:v(root,'clientPhone'),notes:v(root,'clientNotes')};
@@ -233,6 +250,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    if(!p)return;
    for(const [field,property] of [['productName','name'],['productCategory','category'],['productPrice','price'],['stockMode','stockMode']])
     el(root,field).value=p[property]??'';
+   el(root,'productOptions').value=(p.options||[]).map(o=>o.name+'|'+o.extra).join('\n');
   }
   if(e.target.matches('[data-cloud="clientEdit"]')){
    const c=clients.find(x=>x.id===e.target.value);
