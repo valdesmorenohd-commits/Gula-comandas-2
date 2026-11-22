@@ -54,6 +54,10 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   variation.innerHTML='<option value="">Sin opción</option>'+((prod?.options||[]).map(o=>'<option value="'+safe(o.name)+'">'+safe(o.name)+(o.extra?' + '+clp(o.extra):'')+'</option>').join(''));
   if((prod?.options||[]).some(o=>o.name===selected))variation.value=selected;
   if(prod?.options?.length)variation.value=variation.value||prod.options[0].name;
+  const editProduct=el(root,'productEdit'),previousProduct=editProduct.value;
+  editProduct.innerHTML='<option value="">Nuevo producto</option>'+
+   products.map(p=>'<option value="'+safe(p.id)+'">'+safe(p.name)+'</option>').join('');
+  if(products.some(p=>p.id===previousProduct))editProduct.value=previousProduct;
   el(root,'productCount').textContent=products.length+' productos compartidos';
   el(root,'productList').innerHTML=products.map(p=>'<div class="line"><b>'+safe(p.name)+'</b><span>'+clp(p.price)+' · '+(p.stockMode==='dated'?'Por fecha':'Permanente')+'</span></div>').join('')||'<p>Sin catálogo compartido.</p>';
  }
