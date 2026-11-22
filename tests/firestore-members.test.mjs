@@ -108,10 +108,11 @@ test('administrador puede crear membresía de personal, no una de principal',asy
  }));
 });
 
-test('ningún usuario puede leer pedidos comerciales todavía',async()=>{
+test('miembros activos pueden consultar borradores, pero no acceder a caja',async()=>{
  for(const uid of [OWNER,STAFF]){
   const db=env.authenticatedContext(uid).firestore();
-  await assertFails(getDoc(doc(db,'businesses',BUSINESS,'orders','test-order')));
+  await assertSucceeds(getDoc(doc(db,'businesses',BUSINESS,'orders','test-order')));
+  await assertFails(getDoc(doc(db,'businesses',BUSINESS,'cashEntries','test-cash')));
  }
 });
 
