@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {initializeApp,deleteApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 import {createSalesCore} from '../core.mjs';
+import {localChileDay} from '../validation.mjs';
 
 if(!process.env.FIRESTORE_EMULATOR_HOST)throw Error('La prueba exige FIRESTORE_EMULATOR_HOST');
 const app=initializeApp({projectId:'gula-members-test'},'test-sales-core');
@@ -132,4 +133,37 @@ test('caja manual exige motivo y nunca duplica reintentos',async()=>{
  assert.equal((await base.collection('cashEntries').get()).size,1);
  assert.equal((await base.collection('audit').get()).size,1);
  await assert.rejects(()=>service.recordCashMovement(owner,{...movement,idempotencyKey:'cash_wrong_12345',category:''}));
+});
+
+test('cierre de caja exige revisar comandas pendientes y guarda arqueo',async()=>{
+ const day=localChileDay();
+ const order=await service.createSaleOrder(owner,{...request('create_today_abcdef123'),deliveryDate:day});
+ await service.recordSalePayment(owner,{orderId:order.id,idempotencyKey:'pay_today_abcdef123',amount:2500,method:'efectivo'});
+ await service.recordCashMovement(owner,{idempotencyKey:'cashout_today_abc12',direction:'out',category:'Compra de insumos',
+   note:'Harina',amount:500,method:'efectivo'});
+ const preview=await service.previewCashDay(owner,{day,openingCash:1000});
+ assert.equal(preview.closed,false);
+ assert.equal(preview.pendingCount,1);
+ assert.equal(preview.pendingAmount,5500);
+ assert.equal(preview.totals.cashNet,2000);
+ assert.equal(preview.totals.expectedCash,3000);
+ await assert.rejects(()=>service.closeCashDay(owner,{day,openingCash:1000,physicalCash:3200,
+   pendingReviewed:false,idempotencyKey:'close_today_abcdef123'}));
+ const input={day,openingCash:1000,physicalCash:3200,pendingReviewed:true,idempotencyKey:'close_today_abcdef123'};
+ const result=await service.closeCashDay(owner,input);
+ assert.equal(result.difference,200);
+ assert.equal(result.pendingCount,1);
+ assert.deepEqual(await service.closeCashDay(owner,input),result);
+ assert.equal((await base.collection('cashClosures').get()).size,1);
+ const after=await service.previewCashDay(owner,{day,openingCash:1000});
+ assert.equal(after.closed,true);
+ await assert.rejects(()=>service.recordSalePayment(owner,{orderId:order.id,idempotencyKey:'pay_after_close_abc',amount:1000,method:'tef'}));
+ await assert.rejects(()=>service.recordCashMovement(owner,{idempotencyKey:'cash_after_close_abc',direction:'in',
+   category:'Ingreso adicional',amount:1000,method:'efectivo'}));
+});
+test('personal no puede cerrar caja ni consultar la previsualización',async()=>{
+ const day=localChileDay();
+ await assert.rejects(()=>service.previewCashDay(staff,{day,openingCash:0}));
+ await assert.rejects(()=>service.closeCashDay(staff,{day,openingCash:0,
+   pendingReviewed:true,idempotencyKey:'close_staff_abcdef12'}));
 });
