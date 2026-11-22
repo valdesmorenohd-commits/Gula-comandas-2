@@ -13,6 +13,9 @@ export function sharedSales(firebaseApp,businessId='gula'){
  const createOrder=httpsCallable(fn,'createSaleOrder');
  const recordPayment=httpsCallable(fn,'recordSalePayment');
  const adjustInventory=httpsCallable(fn,'adjustSaleInventory');
+ const cancelOrder=httpsCallable(fn,'cancelSaleOrder');
+ const recordRefund=httpsCallable(fn,'recordSaleRefund');
+ const cashMovement=httpsCallable(fn,'recordCashMovement');
  // La app debe conservar la clave de cada solicitud hasta obtener confirmación.
  // No crear una clave nueva al reintentar un pago o guardado incierto.
  const key=()=>crypto.randomUUID();
@@ -32,6 +35,18 @@ export function sharedSales(firebaseApp,businessId='gula'){
    if(!idempotencyKey)throw Error('Necesitas conservar la clave del ajuste');
    const result=await adjustInventory({productId,date,delta,reason,idempotencyKey});
    return result.data;
+  },
+  async cancelOrder(orderId,reason,idempotencyKey){
+   if(!idempotencyKey)throw Error('Conserva la clave de anulación hasta recibir respuesta');
+   return (await cancelOrder({orderId,reason,idempotencyKey})).data;
+  },
+  async recordRefund(orderId,amount,method,idempotencyKey){
+   if(!idempotencyKey)throw Error('Conserva la clave de devolución hasta recibir respuesta');
+   return (await recordRefund({orderId,amount,method,idempotencyKey})).data;
+  },
+  async recordCashMovement(data,idempotencyKey){
+   if(!idempotencyKey)throw Error('Conserva la clave del movimiento hasta recibir respuesta');
+   return (await cashMovement({...data,idempotencyKey})).data;
   },
   watchOrders(handler,onError){
    return onSnapshot(query(orders,orderBy('createdAt','desc'),limit(200)),
