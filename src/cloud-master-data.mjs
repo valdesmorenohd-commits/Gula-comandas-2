@@ -17,7 +17,20 @@ function validateProduct(data){
  const price=Number(data.price);
  if(!Number.isSafeInteger(price)||price<0||price>10000000)throw Error('Precio no válido');
  const stockMode=data.stockMode==='dated'?'dated':'permanent';
- return {name,category,price,photoUrl,stockMode,active:data.active===true};
+ const options=Array.isArray(data.options)?data.options:[];
+ if(options.length>20)throw Error('Máximo 20 opciones');
+ const seen=new Set();
+ const cleanOptions=options.map(o=>{
+  const optionName=textValue(o.name,80,'Nombre de la opción',{required:true});
+  const extra=Number(o.extra);
+  if(!Number.isSafeInteger(extra)||extra<0||extra>1000000)
+   throw Error('Recargo de opción inválido');
+  const key=optionName.toLowerCase();
+  if(seen.has(key))throw Error('Opciones duplicadas');
+  seen.add(key);
+  return {name:optionName,extra};
+ });
+ return {name,category,price,photoUrl,stockMode,options:cleanOptions,active:data.active===true};
 }
 function validateClient(data){
  const name=textValue(data.name,100,'Nombre del cliente',{required:true});
