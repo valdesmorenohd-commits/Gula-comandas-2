@@ -16,7 +16,8 @@ function validateProduct(data){
  if(photoUrl && !/^https:\/\//.test(photoUrl))throw Error('Usa una URL HTTPS para fotografías compartidas');
  const price=Number(data.price);
  if(!Number.isSafeInteger(price)||price<0||price>10000000)throw Error('Precio no válido');
- return {name,category,price,photoUrl,active:data.active===true};
+ const stockMode=data.stockMode==='dated'?'dated':'permanent';
+ return {name,category,price,photoUrl,stockMode,active:data.active===true};
 }
 function validateClient(data){
  const name=textValue(data.name,100,'Nombre del cliente',{required:true});
