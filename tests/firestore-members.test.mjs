@@ -114,3 +114,32 @@ test('ningún usuario puede leer pedidos comerciales todavía',async()=>{
   await assertFails(getDoc(doc(db,'businesses',BUSINESS,'orders','test-order')));
  }
 });
+
+test('personal autenticado puede crear solo borrador de comanda pendiente',async()=>{
+ const db=env.authenticatedContext(STAFF).firestore();
+ const collectionOrders=collection(db,'businesses',BUSINESS,'orders');
+ const good={
+  businessId:BUSINESS,schemaVersion:1,customer:'Cliente ejemplo',
+  deliveryDate:'2026-11-23',deliveryWindow:'18:00-20:00',
+  items:[{name:'Churros',qty:1}],notes:'',status:'open',paymentStatus:'pending',
+  createdBy:STAFF,updatedBy:STAFF,createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+ };
+ await assertSucceeds(setDoc(doc(collectionOrders,'draft-ok'),good));
+ await assertSucceeds(getDoc(doc(collectionOrders,'draft-ok')));
+ await assertFails(setDoc(doc(collectionOrders,'draft-paid'),{...good,paymentStatus:'paid'}));
+ await assertFails(setDoc(doc(collectionOrders,'draft-fake'),{...good,createdBy:OWNER}));
+ await assertFails(updateDoc(doc(collectionOrders,'draft-ok'),{paymentStatus:'paid',updatedAt:serverTimestamp()}));
+});
+test('no autenticado o suspendido no crea borradores y no hay operaciones de caja',async()=>{
+ const pathOrder=(db,id)=>doc(db,'businesses',BUSINESS,'orders',id);
+ const mock={businessId:BUSINESS,schemaVersion:1,customer:'Ejemplo',deliveryDate:'2026-11-23',
+  deliveryWindow:'',items:[{name:'Brownie',qty:1}],notes:'',status:'open',paymentStatus:'pending',
+  createdBy:STAFF,updatedBy:STAFF,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+ await assertFails(setDoc(pathOrder(env.unauthenticatedContext().firestore(),'guest'),mock));
+ await env.withSecurityRulesDisabled(async ctx=>{
+  await updateDoc(memberDoc(ctx.firestore(),STAFF),{active:false});
+ });
+ await assertFails(setDoc(pathOrder(env.authenticatedContext(STAFF).firestore(),'suspended'),mock));
+ const db=env.authenticatedContext(OWNER).firestore();
+ await assertFails(setDoc(doc(db,'businesses',BUSINESS,'cashEntries','x'),{amount:1000}));
+});
