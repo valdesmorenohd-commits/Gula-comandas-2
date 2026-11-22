@@ -1,13 +1,13 @@
 // Núcleo transaccional aislado, apto para comprobarse en emulador sin desplegar Functions.
 import {FieldValue} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
-import {orderInput,paymentInput,adjustmentInput,idempotencyKey,inventoryKey,computeTotal} from './validation.mjs';
+import {orderInput,paymentInput,adjustmentInput,cancellationInput,refundInput,cashMovementInput,localChileDay,idempotencyKey,inventoryKey,computeTotal} from './validation.mjs';
 export function createSalesCore(db){
  const businessId='gula',base=db.collection('businesses').doc(businessId);
  const forbidden=msg=>{throw new Error(msg)};
  const defaults={
- principal_admin:new Set(['orders.create','payments.record','inventory.adjust']),
- personal:new Set(['orders.create','payments.record','inventory.adjust']),
+ principal_admin:new Set(['orders.create','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage']),
+ personal:new Set(['orders.create','payments.record','inventory.adjust','cash.manage']),
  consulta:new Set()
 };
 async function memberActor(tx,uid,permission){
@@ -74,8 +74,8 @@ function priceFromProduct(product){
   tx.set(counterRef,{value:numberValue,updatedAt:FieldValue.serverTimestamp()});
   tx.set(orderRef,{businessId,schemaVersion:1,number,customer:input.customer,
    deliveryDate:input.deliveryDate,deliveryWindow:input.deliveryWindow,notes:input.notes,
-   items:products.map(p=>({productId:p.productId,name:p.name,quantity:p.quantity,price:p.price})),
-   total,paidTotal:0,balance:total,paymentStatus:'pending',status:'open',
+   items:products.map(p=>({productId:p.productId,name:p.name,quantity:p.quantity,price:p.price,stockMode:p.stockMode})),
+   total,paidTotal:0,refundedTotal:0,refundDue:0,balance:total,paymentStatus:'pending',status:'open',
    createdBy:uid,updatedBy:uid,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
   tx.set(opRef,{uid,kind:'createSaleOrder',result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.created',uid,orderId:orderRef.id,number,total,at:FieldValue.serverTimestamp()});
@@ -105,7 +105,7 @@ async function recordSalePayment(uid,data){
   const result={orderId,paidTotal,balance,paymentStatus:balance===0?'paid':'partial'};
   tx.update(orderRef,{paidTotal,balance,paymentStatus:result.paymentStatus,
    updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
-  tx.set(cashRef,{businessId,kind:'payment',orderId,number:o.number,amount,method,
+  tx.set(cashRef,{businessId,kind:'payment',direction:'in',category:'Pago de comanda',day:localChileDay(),orderId,number:o.number,amount,method,
    createdAt:FieldValue.serverTimestamp(),createdBy:uid});
   tx.set(opRef,{uid,kind:'recordSalePayment',result,createdAt:FieldValue.serverTimestamp()});
   tx.set(auditRef,{kind:'order.payment',uid,orderId,amount,method,at:FieldValue.serverTimestamp()});
@@ -140,5 +140,99 @@ async function adjustSaleInventory(uid,data){
   return result;
  });
 }
- return {createSaleOrder,recordSalePayment,adjustSaleInventory};
+
+async function cancelSaleOrder(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey);
+ const orderId=cleanDocumentId(data?.orderId,'Comanda');
+ const {reason}=cancellationInput(data);
+ const ref=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'cancelSaleOrder');
+ const auditRef=base.collection('audit').doc();
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'orders.cancel');
+  const existing=await tx.get(opRef);
+  if(existing.exists)return existing.data().result;
+  const snap=await tx.get(ref);
+  if(!snap.exists)throw Error('Comanda inexistente');
+  const order=snap.data();
+  if(order.status!=='open')throw Error('La comanda no puede anularse');
+  if(!Array.isArray(order.items)||!order.items.length)throw Error('Productos de comanda inválidos');
+  const reservations=[];
+  for(const item of order.items){
+   const inventoryId=inventoryKey(item.productId,order.deliveryDate,item.stockMode);
+   const invRef=base.collection('inventory').doc(inventoryId);
+   const inv=await tx.get(invRef);
+   if(!inv.exists)throw Error('No se encontró inventario para liberar '+item.name);
+   const current=Number(inv.data().quantity);
+   if(!Number.isSafeInteger(current)||current<0||!Number.isSafeInteger(item.quantity)||item.quantity<1)
+    throw Error('Existencias inconsistentes');
+   const next=current+item.quantity;
+   if(!Number.isSafeInteger(next)||next>100000)throw Error('Stock resultante fuera de rango');
+   reservations.push({ref:invRef,current,next});
+  }
+  const paid=Number(order.paidTotal||0),refunded=Number(order.refundedTotal||0);
+  if(!Number.isSafeInteger(paid)||!Number.isSafeInteger(refunded)||paid<refunded)
+   throw Error('Pagos de comanda inconsistentes');
+  const refundDue=paid-refunded;
+  for(const item of reservations){
+   tx.update(item.ref,{quantity:item.next,updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
+  }
+  tx.update(ref,{status:'canceled',cancelReason:reason,canceledBy:uid,canceledAt:FieldValue.serverTimestamp(),
+   refundDue,balance:0,updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
+  const result={orderId,status:'canceled',refundDue,restoredStock:true};
+  tx.set(opRef,{uid,kind:'cancelSaleOrder',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(auditRef,{kind:'order.canceled',uid,orderId,number:order.number,reason,refundDue,
+   at:FieldValue.serverTimestamp()});
+  return result;
+ });
+}
+
+async function recordSaleRefund(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey);
+ const orderId=cleanDocumentId(data?.orderId,'Comanda');
+ const {amount,method}=refundInput(data);
+ const orderRef=base.collection('orders').doc(orderId),opRef=operationRef(uid,key,'recordSaleRefund');
+ const cashRef=base.collection('cashEntries').doc(),auditRef=base.collection('audit').doc();
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'refunds.record');
+  const previous=await tx.get(opRef);
+  if(previous.exists)return previous.data().result;
+  const snap=await tx.get(orderRef);
+  if(!snap.exists)throw Error('Comanda inexistente');
+  const order=snap.data();
+  if(order.status!=='canceled')throw Error('Primero debe anularse la comanda');
+  const paid=Number(order.paidTotal||0),refunded=Number(order.refundedTotal||0);
+  if(!Number.isSafeInteger(paid)||!Number.isSafeInteger(refunded)||refunded<0||refunded>paid)
+   throw Error('Importes inconsistentes');
+  if(amount>paid-refunded)throw Error('La devolución supera el importe pendiente');
+  const refundedTotal=refunded+amount,refundDue=paid-refundedTotal;
+  const result={orderId,refundedTotal,refundDue};
+  tx.update(orderRef,{refundedTotal,refundDue,updatedAt:FieldValue.serverTimestamp(),updatedBy:uid});
+  tx.set(cashRef,{businessId,kind:'refund',direction:'out',category:'Devolución de comanda',
+   day:localChileDay(),orderId,number:order.number,amount,method,createdAt:FieldValue.serverTimestamp(),createdBy:uid});
+  tx.set(opRef,{uid,kind:'recordSaleRefund',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(auditRef,{kind:'order.refund',uid,orderId,amount,method,at:FieldValue.serverTimestamp()});
+  return result;
+ });
+}
+
+async function recordCashMovement(uid,data){
+ const key=idempotencyKey(data?.idempotencyKey);
+ const {direction,category,note,amount,method}=cashMovementInput(data);
+ const cashRef=base.collection('cashEntries').doc();
+ const opRef=operationRef(uid,key,'recordCashMovement'),auditRef=base.collection('audit').doc();
+ return db.runTransaction(async tx=>{
+  await memberActor(tx,uid,'cash.manage');
+  const previous=await tx.get(opRef);
+  if(previous.exists)return previous.data().result;
+  const result={id:cashRef.id,direction,category,amount,method};
+  tx.set(cashRef,{businessId,kind:'manual',direction,category,note,day:localChileDay(),
+   amount,method,createdAt:FieldValue.serverTimestamp(),createdBy:uid});
+  tx.set(opRef,{uid,kind:'recordCashMovement',result,createdAt:FieldValue.serverTimestamp()});
+  tx.set(auditRef,{kind:'cash.movement',uid,movementId:cashRef.id,direction,category,amount,method,
+   at:FieldValue.serverTimestamp()});
+  return result;
+ });
+}
+
+ return {createSaleOrder,recordSalePayment,adjustSaleInventory,cancelSaleOrder,recordSaleRefund,recordCashMovement};
 }
