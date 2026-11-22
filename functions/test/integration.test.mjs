@@ -307,3 +307,14 @@ test('no se permiten nuevas comandas ni ediciones con un día de entrega cerrado
   idempotencyKey:'edit_after_day_closed'}),/caja cerrada/);
  assert.equal((await base.collection('orders').get()).size,1);
 });
+
+test('consultar operación devuelve el resultado previo sin repetir pago',async()=>{
+ const sale=await service.createSaleOrder(owner,request('status_payment_initial'));
+ const p={orderId:sale.id,idempotencyKey:'payment_status_abcdef',amount:2000,method:'efectivo'};
+ assert.deepEqual(await service.checkSaleOperation(owner,{kind:'recordSalePayment',idempotencyKey:p.idempotencyKey}),{confirmed:false});
+ const first=await service.recordSalePayment(owner,p);
+ const again=await service.checkSaleOperation(owner,{kind:'recordSalePayment',idempotencyKey:p.idempotencyKey});
+ assert.deepEqual(again,{confirmed:true,result:first});
+ assert.equal((await base.collection('cashEntries').get()).size,1);
+ await assert.rejects(()=>service.checkSaleOperation(staff,{kind:'invalid',idempotencyKey:p.idempotencyKey}));
+});
