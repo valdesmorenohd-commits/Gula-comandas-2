@@ -167,3 +167,29 @@ test('personal no puede cerrar caja ni consultar la previsualización',async()=>
  await assert.rejects(()=>service.closeCashDay(staff,{day,openingCash:0,
    pendingReviewed:true,idempotencyKey:'close_staff_abcdef12'}));
 });
+
+test('variantes del mismo producto usan precio oficial y descuentan stock total',async()=>{
+ await base.collection('products').doc(productId).update({options:[
+  {name:'Manjar',extra:0},{name:'Nutella',extra:500}
+ ]});
+ const input={...request('opciones_churros_123'),items:[
+  {productId,option:'Manjar',quantity:2},
+  {productId,option:'Nutella',quantity:3}
+ ]};
+ const result=await service.createSaleOrder(owner,input);
+ assert.equal(result.total,20500);
+ const inventoryRef=base.collection('inventory').doc(productId+'__permanent');
+ assert.equal((await inventoryRef.get()).data().quantity,5);
+ const stored=(await base.collection('orders').doc(result.id).get()).data();
+ assert.deepEqual(stored.items.map(i=>i.option),['Manjar','Nutella']);
+ assert.equal(stored.items[1].price,4500);
+ await service.cancelSaleOrder(owner,{orderId:result.id,idempotencyKey:'cancel_options_1234',reason:'Cliente canceló variante'});
+ assert.equal((await inventoryRef.get()).data().quantity,10);
+});
+test('rechaza opción inexistente aunque el teléfono envíe un precio inventado',async()=>{
+ await base.collection('products').doc(productId).update({options:[{name:'Manjar',extra:0}]});
+ await assert.rejects(()=>service.createSaleOrder(owner,{...request('falsoprecio_abcdef'),items:[
+  {productId,option:'Premium',quantity:1,price:1}
+ ]}));
+ assert.equal((await base.collection('orders').get()).size,0);
+});
