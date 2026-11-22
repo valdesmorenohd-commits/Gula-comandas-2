@@ -25,3 +25,13 @@ test('el carrito admite más de una línea por comanda',()=>{
  assert.match(html,/data-cloud-action="addLine"/);
  assert.match(html,/data-cloud="cart"/);
 });
+
+test('productos compartidos pueden editar variantes con recargos',()=>{
+ assert.match(html,/data-cloud="productOptions"/);
+ assert.match(workspace,/parseProductOptions\(v\(root,'productOptions'\)\)/);
+ assert.match(workspace,/p\.options\|\|\[\]/);
+});
+test('creación de productos y clientes reutiliza clave de guardado',()=>{
+ assert.match(workspace,/master\.addProduct\(getUser\(\),data,key\)/);
+ assert.match(workspace,/master\.addClient\(getUser\(\),data,key\)/);
+});
