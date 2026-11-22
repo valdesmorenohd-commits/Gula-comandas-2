@@ -16,6 +16,8 @@ export function sharedSales(firebaseApp,businessId='gula'){
  const cancelOrder=httpsCallable(fn,'cancelSaleOrder');
  const recordRefund=httpsCallable(fn,'recordSaleRefund');
  const cashMovement=httpsCallable(fn,'recordCashMovement');
+ const previewCash=httpsCallable(fn,'previewCashDay');
+ const closeCash=httpsCallable(fn,'closeCashDay');
  // La app debe conservar la clave de cada solicitud hasta obtener confirmación.
  // No crear una clave nueva al reintentar un pago o guardado incierto.
  const key=()=>crypto.randomUUID();
@@ -47,6 +49,13 @@ export function sharedSales(firebaseApp,businessId='gula'){
   async recordCashMovement(data,idempotencyKey){
    if(!idempotencyKey)throw Error('Conserva la clave del movimiento hasta recibir respuesta');
    return (await cashMovement({...data,idempotencyKey})).data;
+  },
+  async previewCashDay(day,openingCash=0){
+   return (await previewCash({day,openingCash})).data;
+  },
+  async closeCashDay(data,idempotencyKey){
+   if(!idempotencyKey)throw Error('Conserva la clave del cierre');
+   return (await closeCash({...data,idempotencyKey})).data;
   },
   watchOrders(handler,onError){
    return onSnapshot(query(orders,orderBy('createdAt','desc'),limit(200)),
