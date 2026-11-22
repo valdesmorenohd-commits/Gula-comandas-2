@@ -144,3 +144,48 @@ test('no autenticado o suspendido no crea borradores y no hay operaciones de caj
  const db=env.authenticatedContext(OWNER).firestore();
  await assertFails(setDoc(doc(db,'businesses',BUSINESS,'cashEntries','x'),{amount:1000}));
 });
+
+test('productos: miembros activos leen y solo principal puede crear y editar',async()=>{
+ const baseDb=env.authenticatedContext(OWNER).firestore();
+ const productRef=doc(baseDb,'businesses',BUSINESS,'products','p-1');
+ const record={businessId:BUSINESS,schemaVersion:1,name:'Churros',category:'Repostería',price:4000,
+   photoUrl:'',active:true,createdAt:serverTimestamp(),createdBy:OWNER,
+   updatedAt:serverTimestamp(),updatedBy:OWNER};
+ await assertSucceeds(setDoc(productRef,record));
+ await assertSucceeds(getDoc(doc(env.authenticatedContext(STAFF).firestore(),'businesses',BUSINESS,'products','p-1')));
+ await assertSucceeds(updateDoc(productRef,{price:4500,updatedAt:serverTimestamp(),updatedBy:OWNER}));
+ const dbStaff=env.authenticatedContext(STAFF).firestore();
+ await assertFails(updateDoc(doc(dbStaff,'businesses',BUSINESS,'products','p-1'),{price:1,updatedAt:serverTimestamp(),updatedBy:STAFF}));
+ await assertFails(setDoc(doc(dbStaff,'businesses',BUSINESS,'products','p-2'),{...record,createdBy:STAFF,updatedBy:STAFF}));
+ await assertFails(updateDoc(productRef,{createdBy:STAFF,updatedAt:serverTimestamp(),updatedBy:OWNER}));
+ await assertFails(updateDoc(productRef,{price:-20,updatedAt:serverTimestamp(),updatedBy:OWNER}));
+ await assertFails(deleteDoc(productRef));
+});
+test('clientes: personal puede crear y editar campos permitidos, no alterar autoría',async()=>{
+ const db=env.authenticatedContext(STAFF).firestore();
+ const clientRef=doc(db,'businesses',BUSINESS,'clients','c-1');
+ const payload={businessId:BUSINESS,schemaVersion:1,name:'Cliente de prueba',phone:'',notes:'',
+   createdAt:serverTimestamp(),createdBy:STAFF,updatedAt:serverTimestamp(),updatedBy:STAFF};
+ await assertSucceeds(setDoc(clientRef,payload));
+ await assertSucceeds(updateDoc(clientRef,{phone:'912345678',updatedAt:serverTimestamp(),updatedBy:STAFF}));
+ await assertFails(updateDoc(clientRef,{createdBy:OWNER,updatedAt:serverTimestamp(),updatedBy:STAFF}));
+ await assertFails(updateDoc(clientRef,{businessId:'otra',updatedAt:serverTimestamp(),updatedBy:STAFF}));
+ await assertFails(deleteDoc(clientRef));
+ const strangerDb=env.authenticatedContext(STRANGER).firestore();
+ await assertFails(getDoc(doc(strangerDb,'businesses',BUSINESS,'clients','c-1')));
+});
+test('suspendidos no consultan clientes ni productos, y consulta es solo lectura',async()=>{
+ await env.withSecurityRulesDisabled(async ctx=>{
+  await updateDoc(memberDoc(ctx.firestore(),STAFF),{active:false});
+  await setDoc(memberDoc(ctx.firestore(),'readonly-fixture'),basic('readonly-fixture','consulta'));
+ });
+ const suspended=env.authenticatedContext(STAFF).firestore();
+ await assertFails(getDocs(collection(suspended,'businesses',BUSINESS,'products')));
+ await assertFails(getDocs(collection(suspended,'businesses',BUSINESS,'clients')));
+ const observer=env.authenticatedContext('readonly-fixture').firestore();
+ await assertSucceeds(getDocs(collection(observer,'businesses',BUSINESS,'products')));
+ await assertFails(setDoc(doc(observer,'businesses',BUSINESS,'clients','readonly-created'),{
+  businessId:BUSINESS,schemaVersion:1,name:'No autorizado',phone:'',notes:'',
+  createdAt:serverTimestamp(),createdBy:'readonly-fixture',updatedAt:serverTimestamp(),updatedBy:'readonly-fixture'
+ }));
+});
