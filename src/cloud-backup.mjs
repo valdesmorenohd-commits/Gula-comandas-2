@@ -1,6 +1,6 @@
 // Respaldo descargable de colecciones compartidas; no es restauración ni backup programado.
 import {getFirestore,collection,getDocs} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-const types=['members','products','clients','orders','inventory','cashEntries','cashClosures','audit'];
+const types=['members','products','clients','draftOrders','orders','inventory','cashEntries','cashClosures','audit','counters','operations'];
 function clean(value){
  if(value===null||typeof value!=='object')return value;
  if(typeof value.toDate==='function' && typeof value.seconds==='number')return value.toDate().toISOString();
@@ -15,7 +15,7 @@ export async function sharedBackup(firebaseApp,{uid,principal,businessId='gula'}
   data[group]=snapshot.docs.map(d=>({id:d.id,...clean(d.data())}));
  }
  return {format:'gula-firestore-export',version:1,businessId,exportedAt:new Date().toISOString(),exportedBy:uid,
-  note:'Copia de consulta de Firestore, sin contraseñas de Firebase Authentication. No sustituye respaldos automáticos ni permite restauración directa.',
+  note:'Incluye numeración y operaciones de reintento. Contiene datos privados de clientes y personal. No incluye contraseñas de Firebase Authentication ni sustituye respaldos automáticos; no permite restauración directa.',
   data};
 }
 export async function downloadSharedBackup(firebaseApp,session){
