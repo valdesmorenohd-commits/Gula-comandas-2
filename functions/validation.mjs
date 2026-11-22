@@ -52,3 +52,32 @@ export function computeTotal(lines){
  if(!Number.isSafeInteger(sum)||sum<=0||sum>100000000)throw Error('Total inválido');
  return sum;
 }
+
+export function cancellationInput(raw){
+ const reason=String(raw?.reason||'').trim();
+ if(reason.length<5||reason.length>300)throw Error('Indica un motivo de anulación de entre 5 y 300 caracteres');
+ return {reason};
+}
+export function refundInput(raw){
+ return paymentInput(raw);
+}
+export function cashMovementInput(raw){
+ const direction=String(raw?.direction||'');
+ const category=String(raw?.category||'').trim();
+ const note=String(raw?.note||'').trim();
+ const {amount,method}=paymentInput(raw);
+ if(!['in','out'].includes(direction))throw Error('Movimiento de caja inválido');
+ if(category.length<3||category.length>80)throw Error('Categoría de caja inválida');
+ if(note.length>300)throw Error('Observación de caja demasiado larga');
+ return {direction,category,note,amount,method};
+}
+export function validateBusinessDate(value){
+ const day=String(value||'');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day))throw Error('Fecha de caja inválida');
+ const d=new Date(day+'T12:00:00Z');
+ if(Number.isNaN(d.valueOf())||d.toISOString().slice(0,10)!==day)throw Error('Fecha de caja inválida');
+ return day;
+}
+export function localChileDay(date=new Date()){
+ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
+}
