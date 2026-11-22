@@ -21,3 +21,6 @@ const wrap=(method)=>onCall({region:'southamerica-west1',maxInstances:5},async r
 export const createSaleOrder=wrap(sales.createSaleOrder);
 export const recordSalePayment=wrap(sales.recordSalePayment);
 export const adjustSaleInventory=wrap(sales.adjustSaleInventory);
+export const cancelSaleOrder=wrap(sales.cancelSaleOrder);
+export const recordSaleRefund=wrap(sales.recordSaleRefund);
+export const recordCashMovement=wrap(sales.recordCashMovement);
