@@ -13,7 +13,7 @@ export function receiptHtml(order,{type='customer',brand='GULA',widthMm=58}={}){
   throw Error('Comanda inválida');
  const kitchen=type==='kitchen';
  const items=order.items.map(i=>{
-  const qty=safeInt(i.quantity),name=escapeHtml(i.name);
+  const qty=safeInt(i.quantity),name=escapeHtml(i.name)+(i.option?' · '+escapeHtml(i.option):'');
   if(qty<1||!name)throw Error('Línea de comanda inválida');
   const lineTotal=qty*safeInt(i.price);
   return '<tr><td>'+qty+' × '+name+'</td>'+(kitchen?'':'<td class="right">'+clp(lineTotal)+'</td>')+'</tr>';
