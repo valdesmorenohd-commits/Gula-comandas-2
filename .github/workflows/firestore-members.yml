@@ -1,7 +1,7 @@
 name: Validar reglas Firestore de usuarios (solo emulador)
 on:
   push:
-    branches: [gula2-usuarios-firebase]
+    branches: [gula2-usuarios-firebase, ventas-firebase-mvp]
   workflow_dispatch:
 
 permissions:
