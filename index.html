@@ -407,6 +407,8 @@ body.picker-open{overflow:hidden}
 <div><label>Categoría</label><input data-cloud="productCategory"></div>
 <div><label>Precio ($)</label><input data-cloud="productPrice" type="number" min="0"></div>
 <div><label>Stock</label><select data-cloud="stockMode"><option value="permanent">Permanente</option><option value="dated">Por fecha</option></select></div></div>
+<label>Opciones y recargos (una por línea: nombre|recargo)</label>
+<textarea data-cloud="productOptions" rows="3" placeholder="Manjar|0&#10;Nutella|500"></textarea>
 <div class="buttons"><button type="button" data-cloud-action="product">Guardar producto</button></div></details></div>
 <div class="panel"><h2>Clientes</h2><p data-cloud="clientCount" class="muted sub"></p>
 <details><summary>Agregar o editar cliente</summary><div class="grid">
