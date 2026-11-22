@@ -393,7 +393,10 @@ body.picker-open{overflow:hidden}
 <h3>Comanda seleccionada</h3><p data-cloud="selectedOrder" class="muted sub">Selecciona una comanda del historial</p>
 <div class="grid"><div><label>Abono ($)</label><input type="number" min="1" data-cloud="amount"></div>
 <div><label>Medio</label><select data-cloud="method"><option value="efectivo">Efectivo</option><option value="tef">TEF</option></select></div></div>
-<div class="buttons"><button class="primary" type="button" data-cloud-action="payment">Registrar abono</button></div>
+<div class="buttons"><button class="primary" type="button" data-cloud-action="payment">Registrar abono</button></div><div class="buttons"><button class="secondary" type="button" data-cloud-action="closeOrder">Cerrar comanda</button></div>
+<details class="spaced"><summary>Reabrir comanda (administración)</summary>
+<label>Motivo</label><input data-cloud="reopenReason" maxlength="300" placeholder="Indica el motivo de reapertura">
+<div class="buttons"><button class="secondary" type="button" data-cloud-action="reopenOrder">Reabrir comanda</button></div></details>
 <details class="spaced"><summary>Anular / Devolver (administración)</summary>
 <label>Motivo de anulación</label><input data-cloud="reason" placeholder="Motivo obligatorio">
 <div class="buttons"><button class="secondary" type="button" data-cloud-action="cancel">Anular comanda</button></div>
