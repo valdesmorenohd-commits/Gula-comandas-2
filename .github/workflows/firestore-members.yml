@@ -22,5 +22,7 @@ jobs:
           java-version: '21'
       - name: Instalar dependencias locales de prueba
         run: npm install --no-audit --no-fund
-      - name: Probar reglas en emulador (sin credenciales reales)
+      - name: Instalar dependencias del servidor sin desplegar
+        run: npm install --prefix functions --no-audit --no-fund
+      - name: Probar reglas y transacciones comerciales (solo emulador)
         run: npm run test:rules
