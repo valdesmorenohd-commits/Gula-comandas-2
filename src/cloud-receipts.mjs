@@ -64,11 +64,13 @@ export function openReceiptPrint(order,opts={}){
  const html=receiptHtml(order,opts);
  const target=window.open('','_blank');
  if(!target)throw Error('Permite ventanas emergentes para imprimir');
+ // El evento debe registrarse antes de escribir el documento: Safari puede
+ // terminar de cargar antes de que se registre un listener tardío.
+ target.addEventListener('load',()=>target.print(),{once:true});
  target.document.open();
  target.document.write(html);
  target.document.close();
  target.focus();
  // Impresión mediante navegador/AirPrint. No controlar impresoras sin integración.
- target.addEventListener('load',()=>target.print(),{once:true});
  return target;
 }
