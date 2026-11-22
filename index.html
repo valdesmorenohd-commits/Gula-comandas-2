@@ -380,13 +380,17 @@ body.picker-open{overflow:hidden}
 <div class="buttons"><button id="adminSaveAppearance" class="primary" type="button">Guardar apariencia</button><button id="adminRemoveLogo" class="secondary" type="button">Quitar logo</button><button id="adminResetAppearance" class="secondary" type="button">Restablecer apariencia</button></div><p id="adminAppearanceMessage" class="sub" role="status"></p></div>
 <div class="panel"><h2>Usuarios y permisos</h2><p class="muted sub"><strong>Simulación de roles, no permisos activos.</strong> Selecciona un perfil para revisar qué acciones podría realizar. No cambia tu cuenta ni permite administrar usuarios: antes de producción habrá validación en Firebase.</p><div class="grid"><div><label for="rolePreview">Ver permisos del perfil</label><select id="rolePreview"><option value="principal_admin">Administración principal</option><option value="personal">Personal</option><option value="consulta">Solo consulta</option></select></div></div><p class="muted sub" id="rolePreviewCaption" role="status"></p><div id="rolePreviewList" class="role-preview-list"></div><p class="muted sub">Las excepciones individuales se validarán en el servidor; esta vista es únicamente una propuesta. Los usuarios autenticados no reciben privilegios por seleccionar un perfil aquí.</p></div>
 <div class="panel" id="firebaseUserPanel" hidden>
-<h2>Administrar usuarios · Firebase</h2>
-<p class="muted sub"><b>Accesos reales a Gula en fase de pruebas.</b> Solo la administración principal puede asignar o suspender membresías. Debes crear primero la cuenta en Firebase Authentication y copiar su UID: este formulario no crea cuentas ni cambia contraseñas.</p>
-<p id="firebaseUserStatus" class="sub" role="status"></p>
-<div class="grid"><div><label for="firebaseStaffUid">UID de cuenta Firebase Authentication</label><input id="firebaseStaffUid" autocomplete="off" maxlength="128" placeholder="UID exacto"></div><div><label for="firebaseStaffName">Nombre</label><input id="firebaseStaffName" maxlength="80"></div><div><label for="firebaseStaffEmail">Correo de la cuenta</label><input id="firebaseStaffEmail" type="email" maxlength="160"></div><div><label for="firebaseStaffRole">Perfil</label><select id="firebaseStaffRole"><option value="personal">Personal</option><option value="consulta">Solo consulta</option></select></div><div><label for="firebaseStaffActive">Estado</label><select id="firebaseStaffActive"><option value="active">Activo</option><option value="inactive">Suspendido</option></select></div></div>
-<details class="spaced"><summary>Permisos individuales</summary><div id="firebaseStaffPermissions" class="demo-permission-list"></div></details>
-<div class="buttons spaced"><button id="firebaseStaffSave" type="button" class="primary">Vincular cuenta existente</button><button id="firebaseStaffCancel" type="button" class="secondary">Limpiar</button><button id="firebaseStaffReload" type="button" class="secondary">Actualizar usuarios</button></div>
-<h3>Usuarios vinculados</h3><div id="firebaseStaffList"></div>
+<h2>Usuarios</h2>
+<div class="buttons spaced"><button id="firebaseStaffAdd" type="button" class="primary">Agregar usuario</button><button id="firebaseStaffReload" type="button" class="secondary">Actualizar</button></div>
+<p id="firebaseUserStatus" class="sub" role="status" aria-live="polite"></p>
+<div id="firebaseStaffList"></div>
+<div id="firebaseStaffForm" class="spaced" hidden>
+<hr class="spaced"><h3 id="firebaseStaffFormTitle">Agregar usuario existente</h3>
+<p class="muted sub" id="firebaseStaffHelp">La cuenta debe existir en Firebase Authentication. Ingresa su UID para vincularla.</p>
+<div class="grid"><div><label for="firebaseStaffUid">UID de Firebase</label><input id="firebaseStaffUid" autocomplete="off" maxlength="128" placeholder="UID de la cuenta"></div><div><label for="firebaseStaffName">Nombre</label><input id="firebaseStaffName" maxlength="80"></div><div><label for="firebaseStaffEmail">Correo</label><input id="firebaseStaffEmail" type="email" maxlength="160"></div><div><label for="firebaseStaffRole">Perfil</label><select id="firebaseStaffRole"><option value="personal">Personal</option><option value="consulta">Solo consulta</option></select></div><div><label for="firebaseStaffActive">Estado</label><select id="firebaseStaffActive"><option value="active">Activo</option><option value="inactive">Suspendido</option></select></div></div>
+<details class="spaced" id="firebaseStaffAdvanced"><summary>Permisos individuales</summary><div id="firebaseStaffPermissions" class="demo-permission-list"></div></details>
+<div class="buttons spaced"><button id="firebaseStaffSave" type="button" class="primary">Vincular usuario</button><button id="firebaseStaffCancel" type="button" class="secondary">Cancelar</button></div>
+</div>
 </div>
 <div class="panel" id="demoUserPanel"><h2>Administrar usuarios (borrador)</h2>
 <p class="muted sub"><b>Solo planificación local.</b> Puedes preparar una lista de integrantes y sus permisos para revisarla. No crea cuentas, no envía invitaciones ni cambia el acceso a Firebase. Estos datos se guardan únicamente en este navegador.</p>
@@ -980,7 +984,8 @@ function firebaseStaffClear(){
  editingStaffUid=null;
  for(const id of ['firebaseStaffUid','firebaseStaffName','firebaseStaffEmail'])$(id).value='';
  $('firebaseStaffUid').readOnly=false;$('firebaseStaffRole').value='personal';$('firebaseStaffActive').value='active';
- $('firebaseStaffSave').textContent='Vincular cuenta existente';drawStaffPermissions();
+ $('firebaseStaffSave').textContent='Vincular usuario';drawStaffPermissions();
+ $('firebaseStaffForm').hidden=true;$('firebaseStaffAdvanced').open=false;
 }
 function drawStaffPermissions(staff){
  const defaults=new Set(ROLE_DEFAULTS[$('firebaseStaffRole').value]||[]);
@@ -1001,7 +1006,7 @@ function displayFirebaseStaff(){
  const el=$('firebaseStaffList');
  el.innerHTML=staffRows.length?staffRows.map(m=>{
   const own=m.uid===user?.uid,confirming=confirmingSuspendUid===m.uid,disabled=!m.active;
-  const actions=own?'<small>Tu cuenta (protegida)</small>':
+  const actions=own?'<small>Administrador principal · Cuenta protegida</small>':
     '<button type="button" class="secondary" data-firebase-edit="'+escapeHTML(m.uid)+'">Editar</button>'+
     '<button type="button" class="secondary" data-firebase-suspend="'+escapeHTML(m.uid)+'" '+(disabled?'disabled':'')+'>'+ (confirming?'Confirmar suspensión':'Suspender')+'</button>'+
     (confirming?'<button type="button" class="secondary" data-firebase-cancel-suspend="'+escapeHTML(m.uid)+'">Cancelar</button>':'');
@@ -1015,11 +1020,12 @@ async function refreshFirebaseStaff(){
  try{
   const rows=await accessApi.list(actor);
   if(epoch!==authEpoch||!user)return;
-  staffRows=rows;displayFirebaseStaff();$('firebaseUserStatus').textContent='Listado actualizado desde Firestore.';
+  staffRows=rows;displayFirebaseStaff();$('firebaseUserStatus').textContent='';
  }catch(e){if(epoch!==authEpoch)return;$('firebaseUserStatus').textContent='No se pudo consultar: '+(e.code||e.message)}
 }
 $('firebaseStaffRole').addEventListener('change',()=>drawStaffPermissions());
 $('firebaseStaffCancel').addEventListener('click',firebaseStaffClear);
+$('firebaseStaffAdd').addEventListener('click',()=>{firebaseStaffClear();$('firebaseStaffFormTitle').textContent='Agregar usuario existente';$('firebaseStaffHelp').hidden=false;$('firebaseStaffForm').hidden=false;$('firebaseStaffUid').focus();});
 $('firebaseStaffReload').addEventListener('click',refreshFirebaseStaff);
 $('firebaseStaffSave').addEventListener('click',async()=>{
  const button=$('firebaseStaffSave'),status=$('firebaseUserStatus');
@@ -1042,11 +1048,12 @@ $('firebaseStaffList').addEventListener('click',async e=>{
   confirmingSuspendUid=null;
   const member=staffRows.find(m=>m.uid===edit.dataset.firebaseEdit);
   if(!member||member.uid===user?.uid)return;
-  editingStaffUid=member.uid;$('firebaseStaffUid').value=member.uid;$('firebaseStaffUid').readOnly=true;
+  editingStaffUid=member.uid;$('firebaseStaffFormTitle').textContent='Editar · '+member.name;$('firebaseStaffHelp').hidden=true;$('firebaseStaffForm').hidden=false;$('firebaseStaffUid').value=member.uid;$('firebaseStaffUid').readOnly=true;
   $('firebaseStaffName').value=member.name||'';$('firebaseStaffEmail').value=member.email||'';
   $('firebaseStaffRole').value=member.roleId;$('firebaseStaffActive').value=member.active?'active':'inactive';
   drawStaffPermissions(member);$('firebaseStaffSave').textContent='Guardar cambios en Firebase';
   displayFirebaseStaff();
+  $('firebaseStaffForm').scrollIntoView({behavior:'smooth',block:'start'});
  }
  if(suspend){
   const uid=suspend.dataset.firebaseSuspend;
