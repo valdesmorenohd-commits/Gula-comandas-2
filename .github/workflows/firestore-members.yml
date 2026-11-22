@@ -4,6 +4,10 @@ on:
     branches: [gula2-usuarios-firebase, ventas-firebase-mvp]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
