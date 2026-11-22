@@ -11,6 +11,7 @@ export function sharedSales(firebaseApp,businessId='gula'){
  const inventory=collection(db,'businesses',businessId,'inventory');
  const cash=collection(db,'businesses',businessId,'cashEntries');
  const createOrder=httpsCallable(fn,'createSaleOrder');
+ const editOrder=httpsCallable(fn,'editSaleOrder');
  const recordPayment=httpsCallable(fn,'recordSalePayment');
  const adjustInventory=httpsCallable(fn,'adjustSaleInventory');
  const cancelOrder=httpsCallable(fn,'cancelSaleOrder');
@@ -29,6 +30,10 @@ export function sharedSales(firebaseApp,businessId='gula'){
    if(!idempotencyKey)throw Error('Necesitas conservar la clave de la operación');
    const result=await createOrder({...data,idempotencyKey});
    return result.data;
+  },
+  async editOrder(orderId,data,idempotencyKey){
+   if(!idempotencyKey)throw Error('Conserva la clave de la edición');
+   return (await editOrder({orderId,...data,idempotencyKey})).data;
   },
   async recordPayment(orderId,amount,method,idempotencyKey){
    if(!idempotencyKey)throw Error('Necesitas conservar la clave del pago');
