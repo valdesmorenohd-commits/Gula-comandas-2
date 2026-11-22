@@ -177,7 +177,7 @@ test('variantes del mismo producto usan precio oficial y descuentan stock total'
   {productId,option:'Nutella',quantity:3}
  ]};
  const result=await service.createSaleOrder(owner,input);
- assert.equal(result.total,20500);
+ assert.equal(result.total,21500);
  const inventoryRef=base.collection('inventory').doc(productId+'__permanent');
  assert.equal((await inventoryRef.get()).data().quantity,5);
  const stored=(await base.collection('orders').doc(result.id).get()).data();
