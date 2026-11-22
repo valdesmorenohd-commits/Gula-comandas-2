@@ -126,6 +126,17 @@ service cloud.firestore {
       allow get, list: if isPrincipal(businessId);
       allow create, update, delete: if false;
     }
+    // Contadores y registro de operaciones son indispensables para recuperar
+    // numeración y evitar repetir cobros al restaurar datos. Solo lectura del
+    // administrador principal: toda modificación pasa por el servidor.
+    match /businesses/{businessId}/counters/{counterId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/operations/{operationId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
     // Catálogo compartido: las existencias NO se ajustan desde esta colección.
     // Solo el administrador principal edita los precios y el catálogo.
     function productValid(data,businessId) {
