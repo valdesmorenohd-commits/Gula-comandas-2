@@ -3,9 +3,7 @@ export function orderInput(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Solicitud inválida');
  const customer=String(raw.customer||'').trim();
  if(customer.length<2||customer.length>100)throw Error('Nombre de cliente inválido');
- const deliveryDate=String(raw.deliveryDate||'');
- if(!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate) || Number.isNaN(Date.parse(deliveryDate+'T12:00:00Z')))
-  throw Error('Fecha de entrega inválida');
+ const deliveryDate=validateBusinessDate(raw.deliveryDate);
  const deliveryWindow=String(raw.deliveryWindow||'').trim();
  if(deliveryWindow.length>100)throw Error('Horario demasiado largo');
  const notes=String(raw.notes||'').trim();
@@ -39,7 +37,7 @@ export function adjustmentInput(raw){
  const productId=String(raw?.productId||''),date=String(raw?.date||'');
  const delta=Number(raw?.delta),reason=String(raw?.reason||'').trim();
  if(!/^[A-Za-z0-9_-]{5,128}$/.test(productId))throw Error('Producto inválido');
- if(date && (!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(date+'T12:00:00Z'))))throw Error('Fecha inválida');
+ if(date)validateBusinessDate(date);
  if(!Number.isSafeInteger(delta)||delta===0||Math.abs(delta)>100000)throw Error('Ajuste inválido');
  if(reason.length<4||reason.length>200)throw Error('Motivo obligatorio de 4 a 200 caracteres');
  return {productId,date,delta,reason};
