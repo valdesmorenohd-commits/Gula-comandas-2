@@ -44,3 +44,10 @@ test('el estado visual advierte las operaciones sin confirmar y evita cambiar im
  assert.match(workspace,/loadPending\(\)/);
  assert.match(workspace,/savePending\(\)/);
 });
+
+test('puede consultar pagos pendientes sin enviar un nuevo cargo',()=>{
+ assert.match(html,/data-cloud-action="checkPending"/);
+ assert.match(workspace,/async function checkAllPending/);
+ assert.match(workspace,/sales\.checkOperation\(cloudKinds\[kind\],row\.key\)/);
+ assert.match(workspace,/pending\.delete\(kind\)/);
+});
