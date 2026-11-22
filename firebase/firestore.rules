@@ -54,7 +54,7 @@ service cloud.firestore {
         ]);
       allow delete: if false;
     }
-    // Preparación del núcleo de ventas: sin activar aún la interfaz.
+    // Los borradores no afectan inventario ni caja; no equivalen a ventas.
     // Las fichas se validan por pertenencia activa; el backend tendrá que
     // verificar totales, inventario y pagos antes de operar con ventas reales.
     function activeMember(businessId) {
@@ -90,7 +90,7 @@ service cloud.firestore {
         && data.createdAt is timestamp
         && data.updatedBy is string && data.updatedAt is timestamp;
     }
-    match /businesses/{businessId}/orders/{orderId} {
+    match /businesses/{businessId}/draftOrders/{orderId} {
       allow get, list: if activeMember(businessId);
       // Únicamente los datos preparatorios sin importes ni movimiento de caja.
       // No se autoriza editar, cerrar, cobrar ni anular desde la web.
@@ -103,6 +103,24 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
       allow update, delete: if false;
+    }
+    // Los datos de ventas definitivas se escriben exclusivamente con
+    // Cloud Functions (Admin SDK en servidor), nunca directamente desde cliente.
+    match /businesses/{businessId}/orders/{orderId} {
+      allow get, list: if activeMember(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/cashEntries/{movementId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/inventory/{inventoryId} {
+      allow get, list: if activeMember(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/audit/{eventId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
     }
     // Catálogo compartido: las existencias NO se ajustan desde esta colección.
     // Solo el administrador principal edita los precios y el catálogo.
