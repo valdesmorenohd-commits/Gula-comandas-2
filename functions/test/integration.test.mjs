@@ -87,3 +87,49 @@ test('dos pedidos concurrentes no consumen más stock del disponible',async()=>{
  assert.equal(r.filter(x=>x.status==='rejected').length,1);
  assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,1);
 });
+
+test('anular pedido devuelve stock una sola vez y deja saldo de devolución',async()=>{
+ const sale=await service.createSaleOrder(owner,request());
+ await service.recordSalePayment(owner,{orderId:sale.id,idempotencyKey:'pago_anular_abcdef',amount:3000,method:'efectivo'});
+ const cmd={orderId:sale.id,idempotencyKey:'anular_abcdefgh123',reason:'El cliente canceló el pedido'};
+ const first=await service.cancelSaleOrder(owner,cmd);
+ assert.equal(first.refundDue,3000);
+ assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,10);
+ const again=await service.cancelSaleOrder(owner,cmd);
+ assert.deepEqual(again,first);
+ assert.equal((await base.collection('inventory').doc(productId+'__permanent').get()).data().quantity,10);
+ await assert.rejects(()=>service.cancelSaleOrder(owner,{...cmd,idempotencyKey:'anular_otra_abcdef'}));
+ assert.equal((await base.collection('orders').doc(sale.id).get()).data().status,'canceled');
+});
+test('devolución no supera pagos, se registra aparte y no se duplica',async()=>{
+ const sale=await service.createSaleOrder(owner,request());
+ await service.recordSalePayment(owner,{orderId:sale.id,idempotencyKey:'pago_devolucion_123',amount:4000,method:'tef'});
+ await assert.rejects(()=>service.recordSaleRefund(owner,{orderId:sale.id,idempotencyKey:'refund_antes_12345',amount:1000,method:'tef'}));
+ await service.cancelSaleOrder(owner,{orderId:sale.id,idempotencyKey:'cancel_devolucion12',reason:'El cliente no quiere el pedido'});
+ const first=await service.recordSaleRefund(owner,{orderId:sale.id,idempotencyKey:'refund_parcial_1234',amount:2000,method:'tef'});
+ assert.equal(first.refundDue,2000);
+ await service.recordSaleRefund(owner,{orderId:sale.id,idempotencyKey:'refund_parcial_1234',amount:2000,method:'tef'});
+ assert.equal((await base.collection('cashEntries').where('kind','==','refund').get()).size,1);
+ await assert.rejects(()=>service.recordSaleRefund(owner,{orderId:sale.id,idempotencyKey:'refund_exceso_1234',amount:2001,method:'tef'}));
+ const full=await service.recordSaleRefund(owner,{orderId:sale.id,idempotencyKey:'refund_final_12345',amount:2000,method:'efectivo'});
+ assert.equal(full.refundDue,0);
+ assert.equal((await base.collection('cashEntries').where('kind','==','refund').get()).size,2);
+});
+test('personal no puede devolver dinero, principal sí',async()=>{
+ const sale=await service.createSaleOrder(owner,request());
+ await service.recordSalePayment(owner,{orderId:sale.id,idempotencyKey:'pago_ref_admin_123',amount:4000,method:'efectivo'});
+ await service.cancelSaleOrder(owner,{orderId:sale.id,idempotencyKey:'anular_ref_admin_123',reason:'Problema con el pedido'});
+ await assert.rejects(()=>service.recordSaleRefund(staff,{orderId:sale.id,idempotencyKey:'refund_staff_12345',amount:1000,method:'efectivo'}));
+ const result=await service.recordSaleRefund(owner,{orderId:sale.id,idempotencyKey:'refund_owner_12345',amount:1000,method:'efectivo'});
+ assert.equal(result.refundDue,3000);
+});
+test('caja manual exige motivo y nunca duplica reintentos',async()=>{
+ const movement={idempotencyKey:'cash_manual_12345',direction:'out',category:'Compra de insumos',note:'Harina',amount:1500,method:'efectivo'};
+ const first=await service.recordCashMovement(owner,movement);
+ assert.equal(first.amount,1500);
+ assert.equal(first.direction,'out');
+ assert.deepEqual(await service.recordCashMovement(owner,movement),first);
+ assert.equal((await base.collection('cashEntries').get()).size,1);
+ assert.equal((await base.collection('audit').get()).size,1);
+ await assert.rejects(()=>service.recordCashMovement(owner,{...movement,idempotencyKey:'cash_wrong_12345',category:''}));
+});
