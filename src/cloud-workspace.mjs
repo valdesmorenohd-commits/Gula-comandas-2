@@ -11,7 +11,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  const sales=sharedSales(firebaseApp);
  const master=sharedMasterData(firebaseApp);
  let products=[],orders=[],clients=[],inventory=[],cash=[],stops=[];
- let active=false,busy=false,selectedOrder=null,selectedProduct=null;
+ let active=false,busy=false,selectedOrder=null,selectedProduct=null,cart=[];
  const pending=new Map();
  function message(txt,kind=''){
   const e=el(root,'message'); if(e){e.textContent=txt;e.className=kind==='error'?'error':kind==='success'?'success':'muted sub'}
@@ -56,6 +56,35 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   el(root,'productCount').textContent=products.length+' productos compartidos';
   el(root,'productList').innerHTML=products.map(p=>'<div class="line"><b>'+safe(p.name)+'</b><span>'+clp(p.price)+' · '+(p.stockMode==='dated'?'Por fecha':'Permanente')+'</span></div>').join('')||'<p>Sin catálogo compartido.</p>';
  }
+ function renderCart(){
+  const box=el(root,'cart');
+  if(!box)return;
+  const sum=cart.reduce((n,line)=>{
+   const p=products.find(x=>x.id===line.productId);
+   const option=(p?.options||[]).find(x=>x.name===line.option);
+   return n+line.quantity*(Number(p?.price||0)+Number(option?.extra||0));
+  },0);
+  box.innerHTML=cart.map((line,i)=>{
+   const p=products.find(x=>x.id===line.productId);
+   return '<div class="line"><span>'+safe(line.quantity)+' × '+safe(p?.name||line.productId)+
+     (line.option?' · '+safe(line.option):'')+'</span><button class="secondary" type="button" data-cloud-remove="'+i+'">Quitar</button></div>';
+  }).join('')||'<p class="muted sub">Agrega productos al pedido.</p>';
+  el(root,'cartTotal').textContent='Total estimado: '+clp(sum)+' (se confirmará en el servidor)';
+ }
+ function addCartLine(){
+  const productId=v(root,'product'),quantity=parseAmount('quantity'),option=v(root,'option');
+  const prod=products.find(p=>p.id===productId&&p.active);
+  if(!prod)throw Error('Selecciona un producto disponible');
+  if(quantity>99)throw Error('Máximo 99 unidades');
+  if(prod.options?.length&&!prod.options.some(o=>o.name===option))throw Error('Selecciona una opción válida');
+  if(cart.length>=20)throw Error('Máximo 20 líneas por comanda');
+  const current=cart.find(line=>line.productId===productId&&line.option===option);
+  if(current){
+   if(current.quantity+quantity>99)throw Error('Máximo 99 unidades por variante');
+   current.quantity+=quantity;
+  }else cart.push({productId,quantity,option});
+  renderCart();
+ }
  function drawOrders(){
   const q=v(root,'search').toLowerCase();
   const rows=orders.filter(o=>!q||String(o.customer||'').toLowerCase().includes(q)||String(o.number||'').toLowerCase().includes(q));
@@ -91,7 +120,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   active=true;message('Conectando datos compartidos…');
   const onError=e=>message('No fue posible leer Firebase: '+(e?.code||e?.message||e),'error');
   stops=[
-   master.watchProducts(rows=>{products=rows;drawProducts();drawInventory()},onError),
+   master.watchProducts(rows=>{products=rows;drawProducts();drawInventory();renderCart()},onError),
    master.watchClients(rows=>{clients=rows;drawClients()},onError),
    sales.watchOrders(rows=>{orders=rows;drawOrders();message('Datos compartidos actualizados.','success')},onError),
    sales.watchInventory(rows=>{inventory=rows;drawInventory()},onError)
@@ -103,7 +132,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  function stop(){
   stops.forEach(f=>{try{f()}catch{}});stops=[];active=false;busy=false;
   selectedOrder=null;selectedProduct=null;pending.clear();
-  products=[];orders=[];clients=[];inventory=[];cash=[];
+  products=[];orders=[];clients=[];inventory=[];cash=[];cart=[];renderCart();
  }
  function parseAmount(id){
   const n=Number(v(root,id));if(!Number.isSafeInteger(n)||n<=0)throw Error('Monto inválido');
@@ -112,16 +141,19 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  async function perform(action){
   if(!active)throw Error('El módulo compartido aún no está conectado');
   const u=permission(action!=='print');
+  if(action==='addLine'){
+   addCartLine();return;
+  }
   if(action==='new'){
-   const productId=v(root,'product'),quantity=parseAmount('quantity');
-   if(!productId||!products.some(p=>p.id===productId))throw Error('Selecciona un producto compartido');
-   const option=v(root,'option'),data={
+   if(!cart.length)throw Error('Agrega al menos un producto a la comanda');
+   const data={
     customer:v(root,'customer').trim(),deliveryDate:v(root,'date'),
     deliveryWindow:v(root,'window'),notes:v(root,'notes'),
-    items:[{productId,option,quantity}]
+    items:cart.map(x=>({...x}))
    };
    const result=await once('new',data,key=>sales.createOrder(data,key));
-   selectedOrder=result.id;el(root,'selectedOrder').textContent=result.number+' · Guardada';
+   selectedOrder=result.id;cart=[];renderCart();
+   el(root,'selectedOrder').textContent=result.number+' · Guardada';
   }else if(action==='payment'){
    if(!selectedOrder)throw Error('Primero selecciona una comanda');
    const payload={orderId:selectedOrder,amount:parseAmount('amount'),method:v(root,'method')};
@@ -167,6 +199,10 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  }
  root.addEventListener('click',async event=>{
   const order=event.target.closest('[data-cloud-order]');
+  const remove=event.target.closest('[data-cloud-remove]');
+  if(remove){
+   cart.splice(Number(remove.dataset.cloudRemove),1);renderCart();return;
+  }
   const print=event.target.closest('[data-cloud-print],[data-cloud-kitchen]');
   if(order){selectedOrder=order.dataset.cloudOrder;drawOrders();return}
   if(print){
