@@ -54,7 +54,57 @@ service cloud.firestore {
         ]);
       allow delete: if false;
     }
-    // Por ahora TODOS los demás datos siguen bloqueados, incluso con sesión.
+    // Preparación del núcleo de ventas: sin activar aún la interfaz.
+    // Las fichas se validan por pertenencia activa; el backend tendrá que
+    // verificar totales, inventario y pagos antes de operar con ventas reales.
+    function activeMember(businessId) {
+      return loggedIn()
+        && exists(memberPath(businessId, request.auth.uid))
+        && get(memberPath(businessId, request.auth.uid)).data.active == true;
+    }
+    function canCreateOrder(businessId) {
+      return activeMember(businessId)
+        && get(memberPath(businessId, request.auth.uid)).data.roleId in ['principal_admin','personal'];
+    }
+    function orderFieldsValid(data,businessId) {
+      return data.keys().hasOnly([
+          'businessId','customer','deliveryDate','deliveryWindow','items',
+          'notes','status','paymentStatus','createdBy','createdAt',
+          'updatedBy','updatedAt','schemaVersion'
+        ])
+        && data.keys().hasAll([
+          'businessId','customer','deliveryDate','deliveryWindow','items',
+          'notes','status','paymentStatus','createdBy','createdAt',
+          'updatedBy','updatedAt','schemaVersion'
+        ])
+        && data.schemaVersion == 1
+        && data.businessId == businessId
+        && data.customer is string && data.customer.size() >= 1 && data.customer.size() <= 100
+        && data.deliveryDate is string && data.deliveryDate.size() == 10
+        && data.deliveryWindow is string && data.deliveryWindow.size() <= 100
+        && data.notes is string && data.notes.size() <= 1500
+        && data.items is list && data.items.size() >= 1 && data.items.size() <= 30
+        && data.status in ['open','canceled','closed']
+        && data.paymentStatus in ['pending','partial','paid']
+        && data.createdBy is string
+        && data.createdAt is timestamp
+        && data.updatedBy is string && data.updatedAt is timestamp;
+    }
+    match /businesses/{businessId}/orders/{orderId} {
+      allow get, list: if activeMember(businessId);
+      // Únicamente los datos preparatorios sin importes ni movimiento de caja.
+      // No se autoriza editar, cerrar, cobrar ni anular desde la web.
+      allow create: if canCreateOrder(businessId)
+        && orderFieldsValid(request.resource.data,businessId)
+        && request.resource.data.status == 'open'
+        && request.resource.data.paymentStatus == 'pending'
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update, delete: if false;
+    }
+    // Las otras colecciones siguen sin acceso. No desplegar hasta validar.
     match /{document=**} {
       allow read, write: if false;
     }
