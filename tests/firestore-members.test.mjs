@@ -108,11 +108,12 @@ test('administrador puede crear membresía de personal, no una de principal',asy
  }));
 });
 
-test('miembros activos pueden consultar borradores, pero no acceder a caja',async()=>{
+test('miembros pueden consultar borradores; caja solo principal',async()=>{
  for(const uid of [OWNER,STAFF]){
   const db=env.authenticatedContext(uid).firestore();
   await assertSucceeds(getDoc(doc(db,'businesses',BUSINESS,'draftOrders','test-order')));
-  await assertFails(getDoc(doc(db,'businesses',BUSINESS,'cashEntries','test-cash')));
+  if(uid===OWNER)await assertSucceeds(getDoc(doc(db,'businesses',BUSINESS,'cashEntries','test-cash')));
+  else await assertFails(getDoc(doc(db,'businesses',BUSINESS,'cashEntries','test-cash')));
  }
 });
 
@@ -149,7 +150,7 @@ test('productos: miembros activos leen y solo principal puede crear y editar',as
  const baseDb=env.authenticatedContext(OWNER).firestore();
  const productRef=doc(baseDb,'businesses',BUSINESS,'products','p-1');
  const record={businessId:BUSINESS,schemaVersion:1,name:'Churros',category:'Repostería',price:4000,
-   photoUrl:'',active:true,createdAt:serverTimestamp(),createdBy:OWNER,
+   photoUrl:'',stockMode:'permanent',active:true,createdAt:serverTimestamp(),createdBy:OWNER,
    updatedAt:serverTimestamp(),updatedBy:OWNER};
  await assertSucceeds(setDoc(productRef,record));
  await assertSucceeds(getDoc(doc(env.authenticatedContext(STAFF).firestore(),'businesses',BUSINESS,'products','p-1')));
