@@ -33,3 +33,13 @@ La web actual (GitHub Pages) **ya está publicada**, pero conserva las comandas,
 - No trasladar ni sobrescribir automáticamente comandas o productos previos desde `localStorage`.
 - No publicar directamente reglas comerciales desde GitHub sin comprobar que coinciden con el código de producción.
 - No presentar el sitio de GitHub Pages como listo para vender mientras los módulos sigan usando almacenamiento local.
+
+## Segunda etapa preparada en la rama de trabajo
+- Anulación de comandas: devuelve el stock una sola vez, conserva la venta anulada y calcula cuánto dinero queda por devolver.
+- Devoluciones parciales registradas exclusivamente por servidor y con permisos específicos, sin superar el importe previamente cobrado.
+- Movimientos manuales de Caja con categoría, medio de pago, concepto y auditoría.
+- Previsualización y cierre de caja por día: efectivo y TEF, saldo inicial, efectivo contado, diferencia y listado de comandas pendientes revisadas. Después del cierre, pagos y movimientos de ese día se rechazan.
+- Precio de opciones (Manjar/Nutella y otras) calculado con los recargos definidos en productos; las variantes comparten stock y se cuentan conjuntamente en reserva y anulación.
+- Impresión de comanda para cliente y cocina en formato 58 mm u 80 mm con escape de HTML. **La impresión es mediante navegador/AirPrint; Bluetooth directo no está implementado.**
+- Pruebas automáticas del backend y del emulador Firestore en GitHub Actions.
+- Todo lo anterior sigue **sin desplegar ni conectar a los módulos existentes**: no activarlo para ventas hasta pasar la integración iPhone/PC/tablet, respaldo y cierre de caja real.
