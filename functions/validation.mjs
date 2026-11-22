@@ -16,13 +16,18 @@ export function orderInput(raw){
  for(const line of raw.items){
   const id=String(line?.productId||'');
   const quantity=Number(line?.quantity);
+  const option=String(line?.option||'').trim();
+  if(option.length>80)throw Error('Opción de producto demasiado larga');
   if(!/^[A-Za-z0-9_-]{5,128}$/.test(id))throw Error('Producto inválido');
   if(!Number.isSafeInteger(quantity)||quantity<1||quantity>99)throw Error('Cantidad inválida');
-  qtys.set(id,(qtys.get(id)||0)+quantity);
-  if(qtys.get(id)>99)throw Error('Cantidad máxima por producto: 99');
+  const key=id+'\u0000'+option;
+  qtys.set(key,(qtys.get(key)||0)+quantity);
+  if(qtys.get(key)>99)throw Error('Cantidad máxima por opción: 99');
  }
  return {customer,deliveryDate,deliveryWindow,notes,
-  items:[...qtys].map(([productId,quantity])=>({productId,quantity}))};
+  items:[...qtys].map(([key,quantity])=>{
+    const [productId,option]=key.split('\u0000');return {productId,option,quantity};
+  })};
 }
 export function paymentInput(raw){
  const amount=Number(raw?.amount),method=String(raw?.method||'').toLowerCase();
