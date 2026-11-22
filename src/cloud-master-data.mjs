@@ -1,6 +1,6 @@
 // Gula Comandas 2.0: acceso compartido a Productos y Clientes.
 // Etapa preparatoria: no convierte la app local en un sistema de ventas real.
-import {getFirestore,collection,doc,getDoc,setDoc,updateDoc,getDocs,onSnapshot,
+import {getFirestore,collection,doc,getDoc,runTransaction,updateDoc,getDocs,onSnapshot,
   query,orderBy,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 function textValue(value,max,label,{required=false}={}){
@@ -52,17 +52,19 @@ export function sharedMasterData(firebaseApp,businessId='gula'){
   const id=String(idempotencyKey||'');
   if(!/^[A-Za-z0-9_-]{12,80}$/.test(id))throw Error('Falta clave única de creación');
   const ref=doc(collectionRef,id);
-  const current=await getDoc(ref);
-  if(current.exists()){
-   const record=current.data();
-   const same=Object.entries(payload).every(([k,v])=>JSON.stringify(record[k])===JSON.stringify(v));
-   if(record.createdBy!==uid||!same)throw Error('La clave de creación ya pertenece a otro registro');
-   return id;
-  }
   try{
-   await setDoc(ref,{businessId,schemaVersion:1,...payload,
+   return await runTransaction(db,async tx=>{
+    const current=await tx.get(ref);
+    if(current.exists()){
+     const record=current.data();
+     const same=Object.entries(payload).every(([k,v])=>JSON.stringify(record[k])===JSON.stringify(v));
+     if(record.createdBy!==uid||!same)throw Error('La clave de creación ya pertenece a otro registro');
+     return id;
+    }
+    tx.set(ref,{businessId,schemaVersion:1,...payload,
      createdAt:serverTimestamp(),createdBy:uid,updatedAt:serverTimestamp(),updatedBy:uid});
-   return id;
+    return id;
+   });
   }catch(error){
    // Una respuesta ambigua no autoriza repetir una creación con otro ID.
    // Consultar la misma referencia y confirmar contenido si el servidor llegó a guardar.
