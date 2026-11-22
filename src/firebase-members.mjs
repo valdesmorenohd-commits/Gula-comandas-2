@@ -62,6 +62,11 @@ export function membershipApi(firebaseApp,businessId) {
       assertPrincipal(actor);
       if(uid===actor.uid)throw Error('No puedes suspenderte a ti mismo');
       await updateDoc(ref(uid),{active:false,updatedAt:serverTimestamp(),updatedBy:actor.uid});
+    },
+    async reactivate(actor,uid) {
+      assertPrincipal(actor);
+      if(uid===actor.uid)throw Error('No puedes modificar tu propia cuenta');
+      await updateDoc(ref(uid),{active:true,updatedAt:serverTimestamp(),updatedBy:actor.uid});
     }
   };
 }
