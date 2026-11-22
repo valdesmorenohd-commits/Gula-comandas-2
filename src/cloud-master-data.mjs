@@ -1,0 +1,74 @@
+// Gula Comandas 2.0: acceso compartido a Productos y Clientes.
+// Etapa preparatoria: no convierte la app local en un sistema de ventas real.
+import {getFirestore,collection,doc,addDoc,updateDoc,getDocs,onSnapshot,
+  query,orderBy,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+function textValue(value,max,label,{required=false}={}){
+  const valueString=String(value??'').trim();
+  if(valueString.length>max || (required && valueString.length<2))
+    throw Error(label+' no válido');
+  return valueString;
+}
+function validateProduct(data){
+ const name=textValue(data.name,100,'Nombre del producto',{required:true});
+ const category=textValue(data.category,80,'Categoría');
+ const photoUrl=textValue(data.photoUrl,500,'URL de fotografía');
+ if(photoUrl && !/^https:\/\//.test(photoUrl))throw Error('Usa una URL HTTPS para fotografías compartidas');
+ const price=Number(data.price);
+ if(!Number.isSafeInteger(price)||price<0||price>10000000)throw Error('Precio no válido');
+ return {name,category,price,photoUrl,active:data.active===true};
+}
+function validateClient(data){
+ const name=textValue(data.name,100,'Nombre del cliente',{required:true});
+ const phone=textValue(data.phone,30,'Teléfono');
+ const notes=textValue(data.notes,500,'Observaciones');
+ return {name,phone,notes};
+}
+export function sharedMasterData(firebaseApp,businessId='gula'){
+ if(businessId!=='gula')throw Error('Identificador de negocio no autorizado');
+ const db=getFirestore(firebaseApp);
+ const products=collection(db,'businesses',businessId,'products');
+ const clients=collection(db,'businesses',businessId,'clients');
+ const actorUid=(actor)=>{
+  if(!actor?.uid)throw Error('Inicia sesión para continuar');
+  return actor.uid;
+ };
+ const readSnapshot=snapshot=>snapshot.docs.map(d=>({id:d.id,...d.data()}));
+ return {
+  async listProducts(){
+   return readSnapshot(await getDocs(query(products,orderBy('name'))));
+  },
+  watchProducts(onData,onError){
+   return onSnapshot(query(products,orderBy('name')),snap=>onData(readSnapshot(snap)),onError);
+  },
+  async addProduct(actor,data){
+   const uid=actorUid(actor);
+   const payload=validateProduct(data);
+   const result=await addDoc(products,{businessId,schemaVersion:1,...payload,
+     createdAt:serverTimestamp(),createdBy:uid,updatedAt:serverTimestamp(),updatedBy:uid});
+   return result.id;
+  },
+  async editProduct(actor,id,data){
+   const uid=actorUid(actor);
+   if(!id)throw Error('Identificador de producto requerido');
+   await updateDoc(doc(products,id),{...validateProduct(data),updatedAt:serverTimestamp(),updatedBy:uid});
+  },
+  async listClients(){
+   return readSnapshot(await getDocs(query(clients,orderBy('name'))));
+  },
+  watchClients(onData,onError){
+   return onSnapshot(query(clients,orderBy('name')),snap=>onData(readSnapshot(snap)),onError);
+  },
+  async addClient(actor,data){
+   const uid=actorUid(actor);
+   const result=await addDoc(clients,{businessId,schemaVersion:1,...validateClient(data),
+     createdAt:serverTimestamp(),createdBy:uid,updatedAt:serverTimestamp(),updatedBy:uid});
+   return result.id;
+  },
+  async editClient(actor,id,data){
+   const uid=actorUid(actor);
+   if(!id)throw Error('Identificador de cliente requerido');
+   await updateDoc(doc(clients,id),{...validateClient(data),updatedAt:serverTimestamp(),updatedBy:uid});
+  }
+ };
+}
