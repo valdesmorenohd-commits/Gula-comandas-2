@@ -30,10 +30,19 @@ function cleanDocumentId(value,label){
  if(!/^[A-Za-z0-9_-]{8,128}$/.test(v))throw Error(label+' inválido');
  return v;
 }
-function priceFromProduct(product){
+function priceFromProduct(product,choice){
  const price=Number(product?.price);
  if(!Number.isSafeInteger(price)||price<0||price>10000000)throw Error('Precio del producto incorrecto');
- return price;
+ const options=Array.isArray(product.options)?product.options:[];
+ if(!options.length){
+  if(choice)throw Error('La opción seleccionada no existe');
+  return price;
+ }
+ const option=options.find(o=>o&&o.name===choice);
+ if(!option)throw Error('Selecciona una opción válida del catálogo');
+ const extra=Number(option.extra);
+ if(!Number.isSafeInteger(extra)||extra<0||extra>1000000)throw Error('Recargo de producto inválido');
+ return price+extra;
 }
 
  async function createSaleOrder(uid,data){
@@ -50,17 +59,26 @@ function priceFromProduct(product){
    const snap=await tx.get(ref);
    if(!snap.exists||snap.data().active!==true)throw Error('Un producto no está disponible');
    const product=snap.data();
-   return {...line,name:product.name,price:priceFromProduct(product),
+   return {...line,name:product.name,price:priceFromProduct(product,line.option),
      stockMode:product.stockMode==='dated'?'dated':'permanent'};
   }));
-  const inventoryRows=await Promise.all(products.map(async p=>{
-   const ref=base.collection('inventory').doc(inventoryKey(p.productId,input.deliveryDate,p.stockMode));
+  // Las opciones Manjar/Nutella del mismo producto comparten existencias:
+  // primero sumar unidades por referencia de inventario, luego descontar una vez.
+  const required=new Map();
+  for(const p of products){
+   const key=inventoryKey(p.productId,input.deliveryDate,p.stockMode);
+   const group=required.get(key)||{key,name:p.name,quantity:0};
+   group.quantity+=p.quantity;
+   required.set(key,group);
+  }
+  const inventoryRows=await Promise.all([...required.values()].map(async group=>{
+   const ref=base.collection('inventory').doc(group.key);
    const snap=await tx.get(ref);
-   if(!snap.exists)throw Error('No hay stock configurado para '+p.name);
+   if(!snap.exists)throw Error('No hay stock configurado para '+group.name);
    const available=Number(snap.data().quantity);
-   if(!Number.isSafeInteger(available)||available<p.quantity)
-    throw Error('Stock insuficiente para '+p.name);
-   return {ref,available,quantity:p.quantity,productId:p.productId};
+   if(!Number.isSafeInteger(available)||available<group.quantity)
+    throw Error('Stock insuficiente para '+group.name);
+   return {ref,available,quantity:group.quantity};
   }));
   const numSnap=await tx.get(counterRef);
   const numberValue=Number(numSnap.exists?numSnap.data().value:0)+1;
@@ -74,7 +92,7 @@ function priceFromProduct(product){
   tx.set(counterRef,{value:numberValue,updatedAt:FieldValue.serverTimestamp()});
   tx.set(orderRef,{businessId,schemaVersion:1,number,customer:input.customer,
    deliveryDate:input.deliveryDate,deliveryWindow:input.deliveryWindow,notes:input.notes,
-   items:products.map(p=>({productId:p.productId,name:p.name,quantity:p.quantity,price:p.price,stockMode:p.stockMode})),
+   items:products.map(p=>({productId:p.productId,name:p.name,option:p.option,quantity:p.quantity,price:p.price,stockMode:p.stockMode})),
    total,paidTotal:0,refundedTotal:0,refundDue:0,balance:total,paymentStatus:'pending',status:'open',
    createdBy:uid,updatedBy:uid,createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
   tx.set(opRef,{uid,kind:'createSaleOrder',result,createdAt:FieldValue.serverTimestamp()});
@@ -159,16 +177,22 @@ async function cancelSaleOrder(uid,data){
   const order=snap.data();
   if(order.status!=='open')throw Error('La comanda no puede anularse');
   if(!Array.isArray(order.items)||!order.items.length)throw Error('Productos de comanda inválidos');
-  const reservations=[];
+  const itemsToRestore=new Map();
   for(const item of order.items){
    const inventoryId=inventoryKey(item.productId,order.deliveryDate,item.stockMode);
-   const invRef=base.collection('inventory').doc(inventoryId);
+   if(!Number.isSafeInteger(item.quantity)||item.quantity<1)throw Error('Cantidad de comanda incorrecta');
+   const group=itemsToRestore.get(inventoryId)||{inventoryId,name:item.name,quantity:0};
+   group.quantity+=item.quantity;
+   itemsToRestore.set(inventoryId,group);
+  }
+  const reservations=[];
+  for(const group of itemsToRestore.values()){
+   const invRef=base.collection('inventory').doc(group.inventoryId);
    const inv=await tx.get(invRef);
-   if(!inv.exists)throw Error('No se encontró inventario para liberar '+item.name);
+   if(!inv.exists)throw Error('No se encontró inventario para liberar '+group.name);
    const current=Number(inv.data().quantity);
-   if(!Number.isSafeInteger(current)||current<0||!Number.isSafeInteger(item.quantity)||item.quantity<1)
-    throw Error('Existencias inconsistentes');
-   const next=current+item.quantity;
+   if(!Number.isSafeInteger(current)||current<0)throw Error('Existencias inconsistentes');
+   const next=current+group.quantity;
    if(!Number.isSafeInteger(next)||next>100000)throw Error('Stock resultante fuera de rango');
    reservations.push({ref:invRef,current,next});
   }
