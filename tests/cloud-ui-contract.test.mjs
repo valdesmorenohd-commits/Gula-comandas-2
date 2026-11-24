@@ -81,3 +81,24 @@ test('historial compartido muestra estado pagado, parcial y pendiente junto al s
  assert.match(html,/\.cloud-payment-partial\{/);
  assert.match(html,/\.cloud-payment-paid\{/);
 });
+
+test('Nueva Comanda ofrece categorías, fotografías y listado alternativo',()=>{
+ assert.match(html,/data-cloud="productCards"/);
+ assert.match(html,/data-cloud="categoryFilters"/);
+ assert.match(html,/data-cloud="product"/);
+ assert.match(workspace,/function drawProductCards/);
+ assert.match(workspace,/data-cloud-pick-product/);
+ assert.match(workspace,/aria-pressed/);
+});
+test('autocompletado de clientes necesita al menos cuatro letras y no bloquea clientes nuevos',()=>{
+ assert.match(html,/list="gulaCloudCustomerSuggestions"/);
+ assert.match(workspace,/function drawCustomerSuggestions/);
+ assert.match(workspace,/search\.length<4/);
+ assert.match(workspace,/slice\(0,8\)/);
+});
+test('previsualización de stock es indicativa y toma fecha de entrega',()=>{
+ assert.match(html,/data-cloud="stockHint"/);
+ assert.match(workspace,/function stockSummary/);
+ assert.match(workspace,/stockMode|mode==='dated'/);
+ assert.match(workspace,/La disponibilidad se confirma al guardar/);
+});
