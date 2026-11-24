@@ -318,3 +318,35 @@ test('consultar operación devuelve el resultado previo sin repetir pago',async(
  assert.equal((await base.collection('cashEntries').get()).size,1);
  await assert.rejects(()=>service.checkSaleOperation(staff,{kind:'invalid',idempotencyKey:p.idempotencyKey}));
 });
+
+test('un permiso denegado individualmente bloquea abonos sin afectar a otras acciones',async()=>{
+ const sale=await service.createSaleOrder(owner,request('denied_payment_order'));
+ await base.collection('members').doc(staff).update({denies:['payments.record']});
+ await assert.rejects(()=>service.recordSalePayment(staff,{orderId:sale.id,
+  amount:2000,method:'efectivo',idempotencyKey:'denied_payment_key_1'}),/perfil/);
+ const result=await service.closeSaleOrder(staff,{orderId:sale.id,
+  idempotencyKey:'allowed_close_staff_1'});
+ assert.equal(result.status,'closed');
+ assert.equal((await base.collection('cashEntries').get()).size,0);
+});
+test('permiso adicional puede autorizar anulación pero no privilegios reservados',async()=>{
+ const sale=await service.createSaleOrder(owner,request('special_grant_order'));
+ await base.collection('members').doc(staff).update({grants:['orders.cancel','users.manage']});
+ const result=await service.cancelSaleOrder(staff,{orderId:sale.id,
+  idempotencyKey:'granted_cancel_staff_1',reason:'Cliente cambió la reserva'});
+ assert.equal(result.status,'canceled');
+ const another=await service.createSaleOrder(owner,request('special_grant_other'));
+ await base.collection('members').doc(staff).update({denies:['orders.cancel']});
+ await assert.rejects(()=>service.cancelSaleOrder(staff,{orderId:another.id,
+  idempotencyKey:'denied_cancel_staff_1',reason:'Cliente cancela pedido'}),/perfil/);
+});
+test('permiso individual puede retirarse mientras la sesión sigue iniciada',async()=>{
+ const sale=await service.createSaleOrder(owner,request('permissions_revoked_order'));
+ await base.collection('members').doc(staff).update({active:false});
+ await assert.rejects(()=>service.recordSalePayment(staff,{orderId:sale.id,
+  idempotencyKey:'revoked_payment_key_1',amount:1000,method:'tef'}),/acceso/);
+ await base.collection('members').doc(staff).update({active:true,roleId:'consulta',grants:['payments.record']});
+ const accepted=await service.recordSalePayment(staff,{orderId:sale.id,
+  idempotencyKey:'grant_payment_consulta_1',amount:1000,method:'tef'});
+ assert.equal(accepted.paidTotal,1000);
+});
