@@ -27,6 +27,7 @@ jobs:
           node --check src/cloud-workspace.mjs
           node --check src/cloud-backup.mjs
           node --check src/cloud-receipts.mjs
+          node --check src/receipt-print-adapter.mjs
           node --check src/cloud-reports.mjs
           node --check src/cloud-report-loader.mjs
           node --check src/cloud-report-export.mjs
