@@ -142,12 +142,18 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  function drawOrders(){
   const q=v(root,'search').toLowerCase();
   const rows=orders.filter(o=>!q||String(o.customer||'').toLowerCase().includes(q)||String(o.number||'').toLowerCase().includes(q));
-  el(root,'orders').innerHTML=rows.map(o=>'<article class="panel"><div class="line"><b>'+safe(o.number||o.id)+'</b><strong>'+clp(o.total)+'</strong></div>'+
-    '<div class="muted sub">'+safe(o.customer)+' · '+safe(o.deliveryDate)+' · '+safe(orderStatus(o))+'</div>'+
-    '<div class="sub">Abonado: '+clp(o.paidTotal)+' · Saldo: '+clp(o.balance)+'</div>'+
+  el(root,'orders').innerHTML=rows.map(o=>{
+   const statusClass=o.status==='canceled'?'void':o.paymentStatus==='paid'?'paid':
+    o.paymentStatus==='partial'?'partial':'pending';
+   return '<article class="panel cloud-order-card cloud-order-'+statusClass+'"><div class="line"><b>'+safe(o.number||o.id)+'</b><strong>'+clp(o.total)+'</strong></div>'+
+    '<div class="muted sub">'+safe(o.customer)+' · '+safe(o.deliveryDate)+'</div>'+
+    '<div class="line"><span class="cloud-payment-state cloud-payment-'+statusClass+'">'+safe(orderStatus(o))+'</span>'+
+    '<strong>Saldo '+clp(o.balance)+'</strong></div>'+
+    '<div class="sub">Abonado: '+clp(o.paidTotal)+'</div>'+
     '<div class="buttons"><button class="secondary" type="button" data-cloud-order="'+safe(o.id)+'">Gestionar</button>'+
     '<button class="secondary" type="button" data-cloud-print="'+safe(o.id)+'">Imprimir cliente</button>'+
-    '<button class="secondary" type="button" data-cloud-kitchen="'+safe(o.id)+'">Cocina</button></div></article>').join('')||'<p class="muted">Sin comandas compartidas.</p>';
+    '<button class="secondary" type="button" data-cloud-kitchen="'+safe(o.id)+'">Cocina</button></div></article>'
+  }).join('')||'<p class="muted">Sin comandas compartidas.</p>';
   if(selectedOrder){
    const order=orders.find(o=>o.id===selectedOrder);
    if(order){el(root,'selectedOrder').textContent=order.number+' · '+order.customer+' · Saldo '+clp(order.balance);return}
