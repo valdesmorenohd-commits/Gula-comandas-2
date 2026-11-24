@@ -4,6 +4,7 @@ import {sharedSales} from './cloud-sales.mjs';
 import {sharedMasterData} from './cloud-master-data.mjs';
 import {openReceiptPrint} from './cloud-receipts.mjs';
 import {downloadSharedBackup} from './cloud-backup.mjs';
+import {buildSharedReport} from './cloud-reports.mjs';
 const safe=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const clp=v=>'$'+Number(v||0).toLocaleString('es-CL');
 const el=(root,id)=>root.querySelector('[data-cloud="'+id+'"]');
@@ -13,6 +14,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  const master=sharedMasterData(firebaseApp);
  let products=[],orders=[],clients=[],inventory=[],cash=[],stops=[];
  let active=false,busy=false,selectedOrder=null,selectedProduct=null,cart=[];
+ let ordersReady=false,cashReady=false;
  const pending=new Map();
  const cloudKinds={new:'createSaleOrder',editOrder:'editSaleOrder',payment:'recordSalePayment',
   adjust:'adjustSaleInventory',cancel:'cancelSaleOrder',closeOrder:'closeSaleOrder',
@@ -174,6 +176,47 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    return {name,extra};
   });
  }
+ function drawCloudReport(){
+  const admin=getAccess()?.membership?.roleId==='principal_admin';
+  const warning=el(root,'reportWarning'),summary=el(root,'reportSummary'),detail=el(root,'reportProducts');
+  if(!ordersReady||(admin&&!cashReady)){
+   warning.textContent='Cargando comandas y movimientos de Firebase…';
+   summary.replaceChildren();detail.replaceChildren();return;
+  }
+  try{
+   const r=buildSharedReport({orders,cashEntries:admin?cash:[],
+    from:v(root,'reportFrom'),to:v(root,'reportTo'),
+    dateType:v(root,'reportDateType'),customer:v(root,'reportCustomer'),
+    status:v(root,'reportStatus')});
+   const labels=[
+    ['Comandas activas',r.activeCount],['Anuladas',r.canceled],
+    ['Venta según fecha de comanda',clp(r.sales)],
+    ['Saldo de comandas seleccionadas',clp(r.receivable)],
+    ['Devoluciones pendientes',clp(r.refundPending)]
+   ];
+   if(admin)labels.push(
+    ['Cobrado en el período',clp(r.payments)],
+    ['Devoluciones efectuadas',clp(r.refunds)],
+    ['Efectivo recibido',clp(r.cashIn)],['Efectivo salido',clp(r.cashOut)],
+    ['TEF recibido',clp(r.tefIn)],['TEF devuelto/salido',clp(r.tefOut)],
+    ['Retiros',clp(r.withdrawals)],['Otros egresos',clp(r.expenses)]);
+   summary.innerHTML='<div class="grid">'+labels.map(([title,value])=>
+    '<div class="kpi"><small>'+safe(title)+'</small><b>'+safe(value)+'</b></div>').join('')+'</div>';
+   detail.innerHTML='<h3>Productos vendidos en las comandas seleccionadas</h3>'+
+    (r.products.length?'<div class="tablewrap"><table><thead><tr><th>Producto</th><th>Unidades</th><th>Importe</th></tr></thead><tbody>'+
+     r.products.slice(0,30).map(p=>'<tr><td>'+safe(p.name)+'</td><td>'+p.units+'</td><td>'+clp(p.total)+'</td></tr>').join('')+
+     '</tbody></table></div>':'<p class="muted sub">No hay productos vendidos en esta selección.</p>');
+   const issues=[];
+   if(r.partialOrders)issues.push('El historial cargado está limitado a las 200 comandas más recientes');
+   if(admin&&r.partialCash)issues.push('Los movimientos cargados están limitados a los 200 más recientes');
+   if(!admin)issues.push('El detalle de movimientos de caja solo está disponible para administración');
+   warning.textContent=issues.length?'Vista parcial: '+issues.join('; ')+'. No utilizar como cierre contable definitivo.':
+    'Resumen de los registros compartidos cargados. La fecha de cobro se calcula por movimientos de caja.';
+  }catch(e){
+   warning.textContent='No se pudo calcular el informe: '+(e?.message||e);
+   summary.replaceChildren();detail.replaceChildren();
+  }
+ }
  function drawClients(){
   const c=v(root,'clientEdit');
   el(root,'clientEdit').innerHTML='<option value="">Nuevo cliente</option>'+clients.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
@@ -183,22 +226,22 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  function begin(){
   if(active)return;
   try{access()}catch{return}
-  active=true;loadPending();pendingNotice();message('Conectando datos compartidos…');
+  active=true;ordersReady=false;cashReady=false;loadPending();pendingNotice();drawCloudReport();message('Conectando datos compartidos…');
   const onError=e=>message('No fue posible leer Firebase: '+(e?.code||e?.message||e),'error');
   stops=[
    master.watchProducts(rows=>{products=rows;drawProducts();drawInventory();renderCart()},onError),
    master.watchClients(rows=>{clients=rows;drawClients()},onError),
-   sales.watchOrders(rows=>{orders=rows;drawOrders();message('Datos compartidos actualizados.','success')},onError),
+   sales.watchOrders(rows=>{orders=rows;ordersReady=true;drawOrders();drawCloudReport();message('Datos compartidos actualizados.','success')},onError),
    sales.watchInventory(rows=>{inventory=rows;drawInventory()},onError)
   ];
   if(getAccess()?.membership?.roleId==='principal_admin'){
-   stops.push(sales.watchCash(rows=>{cash=rows;drawInventory()},onError));
+   stops.push(sales.watchCash(rows=>{cash=rows;cashReady=true;drawInventory();drawCloudReport()},onError));
   }
  }
  function stop(){
   stops.forEach(f=>{try{f()}catch{}});stops=[];active=false;busy=false;
   selectedOrder=null;selectedProduct=null;pending.clear();
-  products=[];orders=[];clients=[];inventory=[];cash=[];cart=[];renderCart();
+  products=[];orders=[];clients=[];inventory=[];cash=[];ordersReady=false;cashReady=false;cart=[];renderCart();
  }
  function parseAmount(id){
   const n=Number(v(root,id));if(!Number.isSafeInteger(n)||n<=0)throw Error('Monto inválido');
@@ -229,6 +272,9 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  async function perform(action){
   if(!active)throw Error('El módulo compartido aún no está conectado');
   const u=permission(action!=='print');
+  if(action==='report'){
+   drawCloudReport();return;
+  }
   if(action==='checkPending'){
    await checkAllPending();return;
   }
