@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:rules": "firebase emulators:exec --only firestore --project gula-members-test \"node --test --test-concurrency=1 tests/firestore-members.test.mjs functions/test/integration.test.mjs functions/test/validation.test.mjs src/test/cloud-receipts.test.mjs src/test/cloud-reports.test.mjs src/test/cloud-report-export.test.mjs tests/cloud-ui-contract.test.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore --project gula-members-test \"node --test --test-concurrency=1 tests/firestore-members.test.mjs functions/test/integration.test.mjs functions/test/validation.test.mjs src/test/cloud-receipts.test.mjs src/test/cloud-reports.test.mjs src/test/cloud-report-export.test.mjs tests/cloud-ui-contract.test.mjs tests/access-policy-unified.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
