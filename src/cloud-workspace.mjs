@@ -7,6 +7,7 @@ import {downloadSharedBackup} from './cloud-backup.mjs';
 import {buildSharedReport} from './cloud-reports.mjs';
 import {loadSharedReportPeriod} from './cloud-report-loader.mjs';
 import {downloadReportCsv} from './cloud-report-export.mjs';
+import {canPerform} from './access-policy.mjs';
 const safe=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const clp=v=>'$'+Number(v||0).toLocaleString('es-CL');
 const el=(root,id)=>root.querySelector('[data-cloud="'+id+'"]');
@@ -53,9 +54,11 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   if(!u||a?.status!=='active')throw Error('Tu sesión no tiene acceso activo a Gula');
   return {uid:u.uid,role:a.membership?.roleId};
  }
- function permission(write=false){
+ function permission(requiredPermission=''){
   const u=access();
-  if(write&&u.role==='consulta')throw Error('Tu perfil es de solo consulta');
+  if(requiredPermission&&!canPerform({authUid:u.uid,businessId:'gula',
+   membership:getAccess().membership,permission:requiredPermission}))
+   throw Error('Tu perfil no tiene el permiso '+requiredPermission);
   return u;
  }
  async function once(kind,payload,doWrite){
@@ -301,7 +304,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  }
  async function perform(action){
   if(!active)throw Error('El módulo compartido aún no está conectado');
-  const u=permission(action!=='print');
+  const u=permission();
   if(action==='exportReport'){
    if(!lastCompleteReport||lastReportFilters!==JSON.stringify(reportFilters()))
     throw Error('Los filtros del informe han cambiado. Consulta de nuevo el período antes de exportar');
@@ -330,6 +333,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    addCartLine();return;
   }
   if(action==='new'){
+   permission('orders.create');
    if(!cart.length)throw Error('Agrega al menos un producto a la comanda');
    const data={
     customer:v(root,'customer').trim(),deliveryDate:v(root,'date'),
@@ -340,6 +344,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    selectedOrder=result.id;cart=[];renderCart();
    el(root,'selectedOrder').textContent=result.number+' · Guardada';
   }else if(action==='editOrder'){
+   permission('orders.edit');
    if(!selectedOrder)throw Error('Selecciona una comanda para editar');
    if(!cart.length)throw Error('Agrega productos al carrito para reemplazar la selección del pedido');
    const payload={orderId:selectedOrder,customer:v(root,'customer').trim(),
@@ -348,38 +353,42 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    await once('editOrder',payload,key=>sales.editOrder(payload.orderId,payload,key));
    cart=[];renderCart();
   }else if(action==='payment'){
+   permission('payments.record');
    if(!selectedOrder)throw Error('Primero selecciona una comanda');
    const payload={orderId:selectedOrder,amount:parseAmount('amount'),method:v(root,'method')};
    await once('payment',payload,key=>sales.recordPayment(payload.orderId,payload.amount,payload.method,key));
   }else if(action==='closeOrder'){
+   permission('orders.close');
    if(!selectedOrder)throw Error('Selecciona una comanda');
    const payload={orderId:selectedOrder};
    await once('closeOrder',payload,key=>sales.closeOrder(payload.orderId,key));
   }else if(action==='reopenOrder'){
    if(!selectedOrder)throw Error('Selecciona una comanda');
-   if(u.role!=='principal_admin')throw Error('Solo administración puede reabrir comandas');
+   permission('orders.reopen');
    const payload={orderId:selectedOrder,reason:v(root,'reopenReason')};
    await once('reopenOrder',payload,key=>sales.reopenOrder(payload.orderId,payload.reason,key));
   }else if(action==='cancel'){
    if(!selectedOrder)throw Error('Selecciona una comanda');
-   if(u.role!=='principal_admin')throw Error('Solo administración puede anular comandas');
+   permission('orders.cancel');
    const payload={orderId:selectedOrder,reason:v(root,'reason')};
    await once('cancel',payload,key=>sales.cancelOrder(payload.orderId,payload.reason,key));
   }else if(action==='refund'){
    if(!selectedOrder)throw Error('Selecciona una comanda');
-   if(u.role!=='principal_admin')throw Error('Solo administración puede devolver dinero');
+   permission('refunds.record');
    const payload={orderId:selectedOrder,amount:parseAmount('refundAmount'),method:v(root,'refundMethod')};
    await once('refund',payload,key=>sales.recordRefund(payload.orderId,payload.amount,payload.method,key));
   }else if(action==='adjust'){
+   permission('inventory.adjust');
    const payload={productId:v(root,'inventoryProduct'),date:v(root,'inventoryDate'),delta:Number(v(root,'inventoryDelta')),
      reason:v(root,'inventoryReason')};
    await once('adjust',payload,key=>sales.adjustInventory(payload.productId,payload.date,payload.delta,payload.reason,key));
   }else if(action==='cash'){
+   permission('cash.manage');
    const payload={direction:v(root,'cashDirection'),category:v(root,'cashCategory'),note:v(root,'cashNote'),
     amount:parseAmount('cashAmount'),method:v(root,'cashMethod')};
    await once('cash',payload,key=>sales.recordCashMovement(payload,key));
   }else if(action==='product'){
-   if(u.role!=='principal_admin')throw Error('Solo administración puede modificar el catálogo');
+   permission('products.manage');
    const id=v(root,'productEdit');
    const original=products.find(p=>p.id===id);
    const data={name:v(root,'productName'),category:v(root,'productCategory'),
@@ -388,6 +397,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
     options:parseProductOptions(v(root,'productOptions'))};
    await once('product',{id,...data},key=>id?master.editProduct(getUser(),id,data):master.addProduct(getUser(),data,key));
   }else if(action==='client'){
+   permission('clients.manage');
    const id=v(root,'clientEdit'),data={name:v(root,'clientName'),phone:v(root,'clientPhone'),notes:v(root,'clientNotes')};
    await once('client',{id,...data},key=>id?master.editClient(getUser(),id,data):master.addClient(getUser(),data,key));
   }else if(action==='preview'){
@@ -395,11 +405,11 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    el(root,'closePreview').textContent=JSON.stringify(result,null,2);
    message('Previsualización de caja disponible.');
   }else if(action==='backup'){
-   if(u.role!=='principal_admin')throw Error('Solo administración puede exportar el respaldo');
+   permission('users.manage');
    const result=await downloadSharedBackup(firebaseApp,{uid:u.uid,principal:true});
    message('Respaldo generado: '+Object.values(result.counts).reduce((n,x)=>n+x,0)+' registros. Guarda el archivo en un lugar privado.','success');
   }else if(action==='close'){
-   if(u.role!=='principal_admin')throw Error('Solo administración puede cerrar caja');
+   permission('cash.close');
    const data={day:v(root,'closeDay'),openingCash:Number(v(root,'openingCash')),
     physicalCash:v(root,'physicalCash')===''?null:Number(v(root,'physicalCash')),
     pendingReviewed:el(root,'pendingReviewed').checked};
