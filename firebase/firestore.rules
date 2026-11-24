@@ -54,7 +54,171 @@ service cloud.firestore {
         ]);
       allow delete: if false;
     }
-    // Por ahora TODOS los demás datos siguen bloqueados, incluso con sesión.
+    // Los borradores no afectan inventario ni caja; no equivalen a ventas.
+    // Las fichas se validan por pertenencia activa; el backend tendrá que
+    // verificar totales, inventario y pagos antes de operar con ventas reales.
+    function activeMember(businessId) {
+      return loggedIn()
+        && exists(memberPath(businessId, request.auth.uid))
+        && get(memberPath(businessId, request.auth.uid)).data.active == true;
+    }
+    // Para colecciones administradas desde el navegador, las reglas deben
+    // verificar los mismos permisos individualizados que Cloud Functions.
+    function hasPermission(businessId, permission) {
+      return activeMember(businessId)
+        && !(permission in get(memberPath(businessId, request.auth.uid)).data.denies)
+        && (
+          get(memberPath(businessId, request.auth.uid)).data.roleId == 'principal_admin'
+          || (
+            get(memberPath(businessId, request.auth.uid)).data.roleId == 'personal'
+            && permission in ['orders.read','orders.create','orders.edit','orders.close',
+                'clients.manage','inventory.adjust','payments.record','cash.manage','reports.read']
+          )
+          || permission in get(memberPath(businessId, request.auth.uid)).data.grants
+        );
+    }
+    function canCreateOrder(businessId) {
+      return hasPermission(businessId,'orders.create');
+    }
+    function orderFieldsValid(data,businessId) {
+      return data.keys().hasOnly([
+          'businessId','customer','deliveryDate','deliveryWindow','items',
+          'notes','status','paymentStatus','createdBy','createdAt',
+          'updatedBy','updatedAt','schemaVersion'
+        ])
+        && data.keys().hasAll([
+          'businessId','customer','deliveryDate','deliveryWindow','items',
+          'notes','status','paymentStatus','createdBy','createdAt',
+          'updatedBy','updatedAt','schemaVersion'
+        ])
+        && data.schemaVersion == 1
+        && data.businessId == businessId
+        && data.customer is string && data.customer.size() >= 1 && data.customer.size() <= 100
+        && data.deliveryDate is string && data.deliveryDate.size() == 10
+        && data.deliveryWindow is string && data.deliveryWindow.size() <= 100
+        && data.notes is string && data.notes.size() <= 1500
+        && data.items is list && data.items.size() >= 1 && data.items.size() <= 30
+        && data.status in ['open','canceled','closed']
+        && data.paymentStatus in ['pending','partial','paid']
+        && data.createdBy is string
+        && data.createdAt is timestamp
+        && data.updatedBy is string && data.updatedAt is timestamp;
+    }
+    match /businesses/{businessId}/draftOrders/{orderId} {
+      allow get, list: if activeMember(businessId);
+      // Únicamente los datos preparatorios sin importes ni movimiento de caja.
+      // No se autoriza editar, cerrar, cobrar ni anular desde la web.
+      allow create: if canCreateOrder(businessId)
+        && orderFieldsValid(request.resource.data,businessId)
+        && request.resource.data.status == 'open'
+        && request.resource.data.paymentStatus == 'pending'
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update, delete: if false;
+    }
+    // Los datos de ventas definitivas se escriben exclusivamente con
+    // Cloud Functions (Admin SDK en servidor), nunca directamente desde cliente.
+    match /businesses/{businessId}/orders/{orderId} {
+      allow get, list: if hasPermission(businessId,'orders.read');
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/cashEntries/{movementId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/inventory/{inventoryId} {
+      allow get, list: if activeMember(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/audit/{eventId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/cashClosures/{day} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
+    // Contadores y registro de operaciones son indispensables para recuperar
+    // numeración y evitar repetir cobros al restaurar datos. Solo lectura del
+    // administrador principal: toda modificación pasa por el servidor.
+    match /businesses/{businessId}/counters/{counterId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
+    match /businesses/{businessId}/operations/{operationId} {
+      allow get, list: if isPrincipal(businessId);
+      allow create, update, delete: if false;
+    }
+    // Catálogo compartido: las existencias NO se ajustan desde esta colección.
+    // Solo el administrador principal edita los precios y el catálogo.
+    function productValid(data,businessId) {
+      return data.keys().hasAll(['businessId','name','category','price','active','stockMode','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.keys().hasOnly(['businessId','name','category','price','options','active','stockMode','photoUrl','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.businessId == businessId
+        && data.schemaVersion == 1
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.category is string && data.category.size() <= 80
+        && data.price is int && data.price >= 0 && data.price <= 10000000
+        && data.active is bool
+        && (!data.keys().hasAny(['options']) || (data.options is list && data.options.size() <= 20))
+        && data.stockMode in ['permanent','dated']
+        && data.photoUrl is string && data.photoUrl.size() <= 500
+        && data.createdAt is timestamp
+        && data.createdBy is string
+        && data.updatedAt is timestamp
+        && data.updatedBy == request.auth.uid;
+    }
+    match /businesses/{businessId}/products/{productId} {
+      allow get, list: if activeMember(businessId);
+      allow create: if hasPermission(businessId,'products.manage')
+        && productValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if hasPermission(businessId,'products.manage')
+        && productValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name','category','price','options','active','stockMode','photoUrl','updatedAt','updatedBy'
+        ]);
+      allow delete: if false;
+    }
+    // Clientes compartidos. Los cambios están limitados a personal y principal.
+    function clientValid(data,businessId) {
+      return data.keys().hasAll(['businessId','name','phone','notes','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.keys().hasOnly(['businessId','name','phone','notes','createdAt','createdBy','updatedAt','updatedBy','schemaVersion'])
+        && data.businessId == businessId
+        && data.schemaVersion == 1
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 30
+        && data.notes is string && data.notes.size() <= 500
+        && data.createdAt is timestamp
+        && data.createdBy is string
+        && data.updatedAt is timestamp
+        && data.updatedBy == request.auth.uid;
+    }
+    match /businesses/{businessId}/clients/{clientId} {
+      allow get, list: if activeMember(businessId);
+      allow create: if hasPermission(businessId,'clients.manage')
+        && clientValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if hasPermission(businessId,'clients.manage')
+        && clientValid(request.resource.data,businessId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name','phone','notes','updatedAt','updatedBy'
+        ]);
+      allow delete: if false;
+    }
+    // Las otras colecciones siguen sin acceso. No desplegar hasta validar.
     match /{document=**} {
       allow read, write: if false;
     }

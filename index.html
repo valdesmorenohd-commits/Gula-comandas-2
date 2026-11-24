@@ -328,6 +328,25 @@ body.picker-open{overflow:hidden}
 #cash .cash-main-filters input[type=date]{max-width:100%;min-width:0}
 @media(max-width:700px){#cash .cash-main-filters{grid-template-columns:minmax(0,1fr)}}
 .date-format-help{display:block;margin:5px 0 0;font-size:12px;line-height:1.2}
+
+/* Estado de pago del historial compartido, legible y sin depender solo del color */
+.cloud-order-card{border-left:5px solid #a7b3ad}
+.cloud-order-pending{border-left-color:#a52d37}
+.cloud-order-partial{border-left-color:#a36c16}
+.cloud-order-paid{border-left-color:#24734a}
+.cloud-order-void{border-left-color:#777}
+.cloud-payment-state{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:750}
+.cloud-payment-pending{background:#fbe8e9;color:#86202a}
+.cloud-payment-partial{background:#fff0d2;color:#794b00}
+.cloud-payment-paid{background:#e2f4e7;color:#185b36}
+.cloud-payment-void{background:#ebebeb;color:#505050}
+
+.cloud-product-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:9px;margin:10px 0}
+.cloud-product-card{display:flex;flex-direction:column;gap:6px;align-items:stretch;border:1px solid #cdd9ce;border-radius:12px;background:#fff;padding:9px;text-align:left;color:inherit}
+.cloud-product-card[aria-pressed="true"]{outline:3px solid #39684b}
+.cloud-product-card img{width:100%;height:95px;object-fit:cover;border-radius:8px;background:#f0f0ed}
+.cloud-product-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:95px;border-radius:8px;background:#edf1e9;color:#344e40;font-size:12px}
+.cloud-product-card small{font-size:12px;color:#415248}
 </style></head>
 <body>
 <header><div class="top"><div class="brand-head"><img id="headerLogo" alt="Logo de Gula" hidden><div><strong id="headerBrandName">GULA</strong><small>Comandas 2.0 · Pruebas</small></div></div><button id="signout" hidden>Cerrar sesión</button></div></header>
@@ -370,6 +389,102 @@ body.picker-open{overflow:hidden}
 
 <div class="panel"><h2 id="rDetailHeading">Detalle de comandas</h2><div id="reportDetails"></div></div><div class="panel"><h2>Movimientos de Caja del período</h2><p class="muted sub">Este cuadro usa la fecha real de cada movimiento y el período seleccionado arriba. Las demás búsquedas corresponden a comandas.</p><div id="reportCashDetail" class="spaced"></div></div>
 </section>
+<section id="cloud" hidden><h1>Ventas compartidas · Firebase</h1>
+<p class="muted sub">Módulo en preparación. Solo se habilitará para ventas después de desplegar y comprobar Cloud Functions, reglas y respaldos. No modifica las comandas locales.</p>
+<div id="cloudWorkspace">
+<div class="panel"><h2>Estado</h2><p data-cloud="message" class="muted sub" role="status">Esperando acceso autorizado.</p><p data-cloud="pendingNotice" class="sub" role="alert"></p><div class="buttons"><button type="button" class="secondary" data-cloud-action="checkPending">Comprobar operaciones pendientes</button></div></div>
+<div class="panel"><h2>Nueva Comanda compartida</h2>
+<div class="grid">
+<div><label>Cliente</label><input data-cloud="customer" list="gulaCloudCustomerSuggestions" maxlength="100" autocomplete="off" placeholder="Escribe 4 letras para buscar"><datalist id="gulaCloudCustomerSuggestions"></datalist><small data-cloud="customerHint" class="muted sub">Puedes escribir un cliente nuevo.</small><button type="button" class="secondary" data-cloud-action="quickClient">Guardar nuevo cliente en el catálogo</button></div>
+<div><label>Entrega</label><input data-cloud="date" type="date"></div>
+<div><label>Hora de entrega (opcional)</label><input data-cloud="window" type="time"></div>
+<div><label>Producto</label><select data-cloud="product"></select></div>
+<div><label>Opción</label><select data-cloud="option"><option value="">Sin opción</option></select></div>
+<div><label>Cantidad</label><input data-cloud="quantity" type="number" min="1" max="99" value="1"></div>
+</div>
+<p class="muted sub">Productos por fotografía (vista predeterminada). El listado también está disponible arriba.</p>
+<div data-cloud="categoryFilters" class="buttons" role="group" aria-label="Categorías de productos"></div>
+<div data-cloud="productCards" class="cloud-product-cards"></div>
+<p data-cloud="stockHint" class="muted sub" role="status"></p>
+<label>Observaciones</label><textarea data-cloud="notes" rows="2"></textarea>
+<div class="buttons"><button type="button" class="secondary" data-cloud-action="addLine">Agregar producto al pedido</button></div>
+<div data-cloud="cart" class="spaced"></div><p data-cloud="cartTotal" class="sub">Total estimado: $0</p>
+<div class="buttons"><button type="button" class="primary" data-cloud-action="new">Guardar comanda en Firebase</button></div>
+<div class="buttons"><button type="button" class="secondary" data-cloud-action="editOrder">Guardar cambios en comanda seleccionada</button></div>
+<p data-cloud="productCount" class="muted sub"></p></div>
+<div class="panel"><h2>Historial Comandas compartidas</h2>
+<label>Buscar cliente o número</label><input data-cloud="search" type="search" placeholder="Buscar">
+<div data-cloud="orders" class="spaced"></div>
+<h3>Comanda seleccionada</h3><p data-cloud="selectedOrder" class="muted sub">Selecciona una comanda del historial</p>
+<div class="grid"><div><label>Abono ($)</label><input type="number" min="1" data-cloud="amount"></div>
+<div><label>Medio</label><select data-cloud="method"><option value="efectivo">Efectivo</option><option value="tef">TEF</option></select></div></div>
+<div class="buttons"><button class="primary" type="button" data-cloud-action="payment">Registrar abono</button></div><div class="buttons"><button class="secondary" type="button" data-cloud-action="closeOrder">Cerrar comanda</button></div>
+<details class="spaced"><summary>Reabrir comanda (administración)</summary>
+<label>Motivo</label><input data-cloud="reopenReason" maxlength="300" placeholder="Indica el motivo de reapertura">
+<div class="buttons"><button class="secondary" type="button" data-cloud-action="reopenOrder">Reabrir comanda</button></div></details>
+<details class="spaced"><summary>Anular / Devolver (administración)</summary>
+<label>Motivo de anulación</label><input data-cloud="reason" placeholder="Motivo obligatorio">
+<div class="buttons"><button class="secondary" type="button" data-cloud-action="cancel">Anular comanda</button></div>
+<div class="grid"><div><label>Devolución ($)</label><input data-cloud="refundAmount" type="number" min="1"></div>
+<div><label>Medio</label><select data-cloud="refundMethod"><option value="efectivo">Efectivo</option><option value="tef">TEF</option></select></div></div>
+<div class="buttons"><button class="secondary" type="button" data-cloud-action="refund">Registrar devolución</button></div></details></div>
+<div class="panel"><h2>Productos</h2><div data-cloud="productList"></div>
+<details><summary>Agregar o editar producto</summary><div class="grid">
+<div><label>Producto existente</label><select data-cloud="productEdit"><option value="">Nuevo producto</option></select></div>
+<div><label>Nombre</label><input data-cloud="productName"></div>
+<div><label>Categoría</label><input data-cloud="productCategory"></div>
+<div><label>Precio ($)</label><input data-cloud="productPrice" type="number" min="0"></div>
+<div><label>Stock</label><select data-cloud="stockMode"><option value="permanent">Permanente</option><option value="dated">Por fecha</option></select></div></div>
+<label>Opciones y recargos (una por línea: nombre|recargo)</label>
+<textarea data-cloud="productOptions" rows="3" placeholder="Manjar|0&#10;Nutella|500"></textarea>
+<div class="buttons"><button type="button" data-cloud-action="product">Guardar producto</button></div></details></div>
+<div class="panel"><h2>Clientes</h2><p data-cloud="clientCount" class="muted sub"></p>
+<details><summary>Agregar o editar cliente</summary><div class="grid">
+<div><label>Cliente existente</label><select data-cloud="clientEdit"><option value="">Nuevo cliente</option></select></div>
+<div><label>Nombre</label><input data-cloud="clientName"></div>
+<div><label>Teléfono</label><input data-cloud="clientPhone"></div></div>
+<label>Observaciones</label><textarea data-cloud="clientNotes"></textarea>
+<div class="buttons"><button type="button" data-cloud-action="client">Guardar cliente</button></div></details></div>
+<div class="panel"><h2>Inventario</h2><div data-cloud="inventoryList"></div>
+<details><summary>Movimiento de existencias</summary><div class="grid">
+<div><label>Producto</label><select data-cloud="inventoryProduct"></select></div>
+<div><label>Fecha (si aplica)</label><input type="date" data-cloud="inventoryDate"></div>
+<div><label>Cantidad (positiva o negativa)</label><input data-cloud="inventoryDelta" type="number" step="1"></div>
+<div><label>Motivo</label><input data-cloud="inventoryReason"></div></div>
+<div class="buttons"><button type="button" data-cloud-action="adjust">Registrar ajuste</button></div></details></div>
+<div class="panel"><h2>Caja</h2><p data-cloud="cashTotal" class="muted sub"></p>
+<details><summary>Entrada, salida o retiro</summary><div class="grid">
+<div><label>Movimiento</label><select data-cloud="cashDirection"><option value="in">Ingreso</option><option value="out">Egreso o retiro</option></select></div>
+<div><label>Categoría</label><input data-cloud="cashCategory"></div>
+<div><label>Importe</label><input data-cloud="cashAmount" type="number" min="1"></div>
+<div><label>Medio</label><select data-cloud="cashMethod"><option value="efectivo">Efectivo</option><option value="tef">TEF</option></select></div>
+<div><label>Detalle</label><input data-cloud="cashNote"></div></div>
+<div class="buttons"><button type="button" data-cloud-action="cash">Registrar movimiento</button></div></details>
+<details><summary>Cierre de caja (administración)</summary><div class="grid">
+<div><label>Día</label><input type="date" data-cloud="closeDay"></div>
+<div><label>Saldo inicial</label><input data-cloud="openingCash" type="number" min="0" value="0"></div>
+<div><label>Contado físicamente</label><input data-cloud="physicalCash" type="number" min="0"></div></div>
+<div class="buttons"><button type="button" data-cloud-action="preview">Revisar caja</button></div>
+<div data-cloud="closePreview" class="spaced" role="status">Pulsa Revisar caja para consultar el resumen.</div>
+<label><input data-cloud="pendingReviewed" type="checkbox"> Revisé las comandas pendientes</label>
+<div class="buttons"><button class="secondary" type="button" data-cloud-action="close">Confirmar cierre</button></div></details></div>
+<div class="panel"><h2>Informes compartidos</h2>
+<p class="muted sub">Ventas según fecha de pedido o entrega; movimientos de caja según la fecha en que se cobraron o pagaron. No son el mismo importe.</p>
+<div class="grid">
+<div><label>Desde</label><input data-cloud="reportFrom" type="date"></div>
+<div><label>Hasta</label><input data-cloud="reportTo" type="date"></div>
+<div><label>Fecha de las comandas</label><select data-cloud="reportDateType"><option value="delivery">Fecha de entrega</option><option value="created">Fecha del pedido</option></select></div>
+<div><label>Cliente</label><input data-cloud="reportCustomer" placeholder="Todos"></div>
+<div><label>Estado</label><select data-cloud="reportStatus"><option value="all">Todos</option><option value="open">Abiertas</option><option value="closed">Cerradas</option><option value="canceled">Anuladas</option><option value="pending">Pendientes</option><option value="partial">Abonadas</option><option value="paid">Pagadas</option></select></div>
+</div>
+<div class="buttons"><button class="secondary" type="button" data-cloud-action="report">Consultar período en Firebase</button><button class="secondary" type="button" data-cloud-action="exportReport">Exportar informe a CSV</button></div>
+<p data-cloud="reportWarning" class="muted sub" role="status"></p>
+<div data-cloud="reportSummary"></div>
+<div data-cloud="reportProducts" class="spaced"></div>
+</div>
+<div class="panel"><h2>Respaldo de Firebase</h2><p class="muted sub">Solo administración. Descarga los registros compartidos en un archivo JSON privado. No incluye contraseñas ni reemplaza el respaldo automático pendiente.</p>
+<div class="buttons"><button type="button" class="secondary" data-cloud-action="backup">Exportar datos de Firebase</button></div></div>
+</div></section>
 <section id="admin" hidden><h1>Administración</h1>
 <div class="panel"><h2>Personalización de la demostración</h2><p class="muted sub">Estas preferencias son personales y solo afectan a este navegador. No cambian la imagen de otros usuarios ni los ajustes globales de Gula.</p>
 <div class="grid"><div><label for="adminTheme">Paleta de colores</label><select id="adminTheme"><option value="gula">Verde Gula</option><option value="terracotta">Terracota</option><option value="slate">Azul pizarra</option><option value="neutral">Blanco y negro</option></select></div>
@@ -430,12 +545,13 @@ import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'htt
 import {simulateRole,PERMISSIONS,ROLE_DEFAULTS} from './src/access-policy.mjs';
 import {normalizeDemoMember,effectiveDemoPermissions,validateDemoRoster} from './src/user-admin-draft.mjs';
 import {membershipApi} from './src/firebase-members.mjs';
+import {attachCloudWorkspace} from './src/cloud-workspace.mjs';
 import {clientPurchaseReport,validBirthday,birthdayInDays,birthdayAlerts,birthdayWindowOffset,birthdayWindowClients} from './src/client-insights.mjs';
 const firebase=initializeApp({apiKey:"AIzaSyA_56edZKtiysPPNc9geqA687gQBXjGxgY",authDomain:"gula-comandas-2-0-pruebas.firebaseapp.com",projectId:"gula-comandas-2-0-pruebas",storageBucket:"gula-comandas-2-0-pruebas.firebasestorage.app",messagingSenderId:"230420123464",appId:"1:230420123464:web:63564b926d6bbfee70ed7d"});
 const auth=getAuth(firebase),accessApi=membershipApi(firebase,'gula'),$=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(n);
 const blank=()=>({orders:[],clients:[],products:[{id:'d1',name:'Churros clásicos (ejemplo)',price:4000,stock:15},{id:'d2',name:'Brownie (ejemplo)',price:1000,stock:20}]});
 let state=blank(), user=null, section='new', editingIndex=null, selectedClientId=null, editingClientId=null, viewingClientId=null;
-const menu=[['new','Nueva Comanda'],['history','Historial Comandas'],['products','Productos'],['clients','Clientes'],['cash','Caja'],['reports','Informes'],['admin','Administración']];
+const menu=[['new','Nueva Comanda'],['history','Historial Comandas'],['products','Productos'],['clients','Clientes'],['cash','Caja'],['reports','Informes'],['cloud','Ventas compartidas'],['admin','Administración']];
 const storageKey=uid=>'gula2_demo_v1_'+uid;
 
 const appearanceKey=uid=>'gula2_personal_appearance_v1_'+uid;
@@ -1095,10 +1211,10 @@ function showAccessState(result,epoch){
  $('demoUserPanel').hidden=true;
  if(active){
   $('accessGateMessage').textContent='';
-  if(!alreadyActive){load(user.uid);loadAppearance();loadDemoUsers();loadBirthdayRange();renderTemplates();go('new');}
+  if(!alreadyActive){load(user.uid);loadAppearance();loadDemoUsers();loadBirthdayRange();renderTemplates();go('new');cloudWorkspace.start();}
   if(result.membership.roleId==='principal_admin'&&!alreadyActive)refreshFirebaseStaff();
  }else{
-  state=blank();staffRows=[];displayFirebaseStaff();
+  cloudWorkspace.stop();state=blank();staffRows=[];displayFirebaseStaff();
   const messages={
    loading:['Verificando acceso','Comprobando tu membresía en Firebase…'],
    missing:['Acceso pendiente','Tu usuario se autenticó, pero no tiene una membresía de Gula. Solicita al administrador que habilite tu UID.'],
@@ -1110,9 +1226,10 @@ function showAccessState(result,epoch){
   $('accessGateTitle').textContent=message[0];$('accessGateMessage').textContent=message[1];
  }
 }
+const cloudWorkspace=attachCloudWorkspace($('cloudWorkspace'),firebase,()=>user,()=>accessState);
 firebaseStaffClear();
 onAuthStateChanged(auth,u=>{
- stopMembership();stopMembership=()=>{};authEpoch++;
+ stopMembership();cloudWorkspace.stop();stopMembership=()=>{};authEpoch++;
  user=u;accessState=null;
  $('auth').hidden=!!u;$('app').hidden=true;$('accessGate').hidden=!u;$('signout').hidden=!u;
  if(u){
