@@ -350,3 +350,32 @@ test('permiso individual puede retirarse mientras la sesión sigue iniciada',asy
   idempotencyKey:'grant_payment_consulta_1',amount:1000,method:'tef'});
  assert.equal(accepted.paidTotal,1000);
 });
+
+test('un empleado con permiso solo de pagos puede verificar un cobro tras una desconexión',async()=>{
+ const sale=await service.createSaleOrder(owner,request('limited_payment_order_1'));
+ await base.collection('members').doc(staff).update({roleId:'consulta',grants:['payments.record'],denies:[]});
+ const payment={orderId:sale.id,amount:1500,method:'tef',idempotencyKey:'limited_payment_key_123'};
+ const initial=await service.checkSaleOperation(staff,{kind:'recordSalePayment',idempotencyKey:payment.idempotencyKey});
+ assert.deepEqual(initial,{confirmed:false});
+ const recorded=await service.recordSalePayment(staff,payment);
+ const status=await service.checkSaleOperation(staff,{kind:'recordSalePayment',idempotencyKey:payment.idempotencyKey});
+ assert.deepEqual(status,{confirmed:true,result:recorded});
+ await assert.rejects(()=>service.checkSaleOperation(staff,{
+  kind:'createSaleOrder',idempotencyKey:'limited_payment_key_123'
+ }),/perfil/);
+ assert.equal((await base.collection('cashEntries').get()).size,1);
+});
+test('una consulta de reintento no muestra operaciones de otros usuarios',async()=>{
+ const sale=await service.createSaleOrder(owner,request('private_payment_order_1'));
+ const key='private_payment_key_123';
+ await service.recordSalePayment(owner,{orderId:sale.id,amount:1000,method:'efectivo',idempotencyKey:key});
+ const check=await service.checkSaleOperation(staff,{kind:'recordSalePayment',idempotencyKey:key});
+ assert.deepEqual(check,{confirmed:false});
+});
+test('al revocar permiso de pago no se puede consultar su confirmación anterior',async()=>{
+ const sale=await service.createSaleOrder(owner,request('payment_revoke_order_1'));
+ const key='payment_revoked_key_12';
+ await service.recordSalePayment(staff,{orderId:sale.id,amount:1200,method:'tef',idempotencyKey:key});
+ await base.collection('members').doc(staff).update({denies:['payments.record']});
+ await assert.rejects(()=>service.checkSaleOperation(staff,{kind:'recordSalePayment',idempotencyKey:key}),/perfil/);
+});
