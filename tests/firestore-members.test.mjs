@@ -247,3 +247,38 @@ test('movimientos de caja por período solo pueden consultarse desde cuenta prin
  assert.equal(owner.size,1);
  await assertFails(requestPage(staffDb));
 });
+
+test('denegación individual bloquea lectura de comandas y creación de clientes',async()=>{
+ await env.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();
+  await updateDoc(memberDoc(db,STAFF),{denies:['orders.read','clients.manage']});
+  await setDoc(doc(db,'businesses',BUSINESS,'orders','order-permission-denied'),{customer:'Ejemplo'});
+ });
+ const db=env.authenticatedContext(STAFF).firestore();
+ await assertFails(getDoc(doc(db,'businesses',BUSINESS,'orders','order-permission-denied')));
+ await assertFails(getDocs(collection(db,'businesses',BUSINESS,'orders')));
+ await assertFails(setDoc(doc(db,'businesses',BUSINESS,'clients','client-permission-denied'),{
+  businessId:BUSINESS,schemaVersion:1,name:'Cliente bloqueado',phone:'',notes:'',
+  createdAt:serverTimestamp(),createdBy:STAFF,updatedAt:serverTimestamp(),updatedBy:STAFF
+ }));
+});
+test('permiso explícito habilita editar catálogo al personal, y revocarlo lo bloquea',async()=>{
+ const dbAdmin=env.authenticatedContext(OWNER).firestore();
+ const dbStaff=env.authenticatedContext(STAFF).firestore();
+ const product=doc(dbAdmin,'businesses',BUSINESS,'products','product-permissions');
+ await assertSucceeds(setDoc(product,{
+  businessId:BUSINESS,schemaVersion:1,name:'Producto real',category:'Repostería',
+  price:4000,active:true,stockMode:'permanent',photoUrl:'',
+  createdAt:serverTimestamp(),createdBy:OWNER,updatedAt:serverTimestamp(),updatedBy:OWNER
+ }));
+ const userProduct=doc(dbStaff,'businesses',BUSINESS,'products','product-permissions');
+ await assertFails(updateDoc(userProduct,{price:4200,updatedAt:serverTimestamp(),updatedBy:STAFF}));
+ await env.withSecurityRulesDisabled(async ctx=>{
+  await updateDoc(memberDoc(ctx.firestore(),STAFF),{grants:['products.manage']});
+ });
+ await assertSucceeds(updateDoc(userProduct,{price:4300,updatedAt:serverTimestamp(),updatedBy:STAFF}));
+ await env.withSecurityRulesDisabled(async ctx=>{
+  await updateDoc(memberDoc(ctx.firestore(),STAFF),{denies:['products.manage']});
+ });
+ await assertFails(updateDoc(userProduct,{price:4400,updatedAt:serverTimestamp(),updatedBy:STAFF}));
+});
