@@ -181,11 +181,11 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    return line.quantity+' × '+(p?.name||line.productId)+(line.option?' ('+line.option+')':'');
   });
   return window.confirm((edit?'¿Guardar cambios en la comanda seleccionada?':'¿Confirmar nueva comanda?')+
-   '\\nCliente: '+data.customer+'\\nEntrega: '+dayCL(data.deliveryDate)+
+   '\nCliente: '+data.customer+'\nEntrega: '+dayCL(data.deliveryDate)+
    (data.deliveryWindow?' · '+data.deliveryWindow:'')+
-   '\\n\\nProductos:\\n'+details.join('\\n')+
-   '\\n\\nTotal estimado: '+clp(total)+
-   '\\nEl precio definitivo y el stock se verificarán al guardar en Firebase.');
+   '\n\nProductos:\n'+details.join('\n')+
+   '\n\nTotal estimado: '+clp(total)+
+   '\nEl precio definitivo y el stock se verificarán al guardar en Firebase.');
  }
  function renderCart(){
   const box=el(root,'cart');
