@@ -16,7 +16,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  const master=sharedMasterData(firebaseApp);
  let products=[],orders=[],clients=[],inventory=[],cash=[],stops=[];
  let active=false,busy=false,selectedOrder=null,selectedProduct=null,cart=[];
- let ordersReady=false,cashReady=false,reportData=null,reportEpoch=0,lastCompleteReport=null;
+ let ordersReady=false,cashReady=false,reportData=null,reportEpoch=0,lastCompleteReport=null,lastReportFilters=null;
  const pending=new Map();
  const cloudKinds={new:'createSaleOrder',editOrder:'editSaleOrder',payment:'recordSalePayment',
   adjust:'adjustSaleInventory',cancel:'cancelSaleOrder',closeOrder:'closeSaleOrder',
@@ -178,9 +178,19 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    return {name,extra};
   });
  }
+ function reportFilters(){
+  return {from:v(root,'reportFrom'),to:v(root,'reportTo'),
+   dateType:v(root,'reportDateType'),customer:v(root,'reportCustomer'),
+   status:v(root,'reportStatus')};
+ }
+ function invalidateReport({data=false}={}){
+  lastCompleteReport=null;lastReportFilters=null;
+  reportEpoch++;
+  if(data)reportData=null;
+ }
  function drawCloudReport(){
   const admin=getAccess()?.membership?.roleId==='principal_admin';
-  lastCompleteReport=null;
+  lastCompleteReport=null;lastReportFilters=null;
   const warning=el(root,'reportWarning'),summary=el(root,'reportSummary'),detail=el(root,'reportProducts');
   if(!ordersReady||(admin&&!cashReady)){
    warning.textContent='Cargando comandas y movimientos de Firebase…';
@@ -213,7 +223,10 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
     (r.products.length?'<div class="tablewrap"><table><thead><tr><th>Producto</th><th>Unidades</th><th>Importe</th></tr></thead><tbody>'+
      r.products.slice(0,30).map(p=>'<tr><td>'+safe(p.name)+'</td><td>'+p.units+'</td><td>'+clp(p.total)+'</td></tr>').join('')+
      '</tbody></table></div>':'<p class="muted sub">No hay productos vendidos en esta selección.</p>');
-   if(loaded&&!dataset.partialOrders&&!dataset.partialCash)lastCompleteReport=r;
+   if(loaded&&!dataset.partialOrders&&!dataset.partialCash){
+    lastCompleteReport=r;
+    lastReportFilters=JSON.stringify(reportFilters());
+   }
    const issues=[];
    if(!loaded){
     issues.push('Vista rápida de solo las 200 comandas más recientes; selecciona fechas y pulsa Actualizar informe para consultar el período');
@@ -242,11 +255,11 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   stops=[
    master.watchProducts(rows=>{products=rows;drawProducts();drawInventory();renderCart()},onError),
    master.watchClients(rows=>{clients=rows;drawClients()},onError),
-   sales.watchOrders(rows=>{orders=rows;ordersReady=true;reportData=null;lastCompleteReport=null;drawOrders();drawCloudReport();message('Datos compartidos actualizados; vuelve a consultar el informe si necesitas exportarlo.','success')},onError),
+   sales.watchOrders(rows=>{orders=rows;ordersReady=true;invalidateReport({data:true});drawOrders();drawCloudReport();message('Datos compartidos actualizados; vuelve a consultar el informe si necesitas exportarlo.','success')},onError),
    sales.watchInventory(rows=>{inventory=rows;drawInventory()},onError)
   ];
   if(getAccess()?.membership?.roleId==='principal_admin'){
-   stops.push(sales.watchCash(rows=>{cash=rows;cashReady=true;reportData=null;lastCompleteReport=null;drawInventory();drawCloudReport()},onError));
+   stops.push(sales.watchCash(rows=>{cash=rows;cashReady=true;invalidateReport({data:true});drawInventory();drawCloudReport()},onError));
   }
  }
  function stop(){
@@ -284,7 +297,8 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   if(!active)throw Error('El módulo compartido aún no está conectado');
   const u=permission(action!=='print');
   if(action==='exportReport'){
-   if(!lastCompleteReport)throw Error('Consulta primero el período completo en Firebase antes de exportar');
+   if(!lastCompleteReport||lastReportFilters!==JSON.stringify(reportFilters()))
+    throw Error('Los filtros del informe han cambiado. Consulta de nuevo el período antes de exportar');
    downloadReportCsv(lastCompleteReport,{showCash:getAccess()?.membership?.roleId==='principal_admin'});
    message('Informe CSV preparado. Puedes abrirlo en Excel.','success');
    return;
@@ -436,6 +450,18 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
     el(root,field).value=c[property]??'';
   }
  });
- root.addEventListener('input',e=>{if(e.target.matches('[data-cloud="search"]'))drawOrders()});
+ root.addEventListener('input',e=>{
+  if(e.target.matches('[data-cloud="search"]'))drawOrders();
+  if(e.target.matches('[data-cloud^="report"]')){
+   invalidateReport();
+   el(root,'reportWarning').textContent='Los filtros han cambiado. Pulsa Consultar período en Firebase para actualizar y exportar.';
+  }
+ });
+ root.addEventListener('change',e=>{
+  if(e.target.matches('[data-cloud^="report"]')){
+   invalidateReport();
+   el(root,'reportWarning').textContent='Vuelve a consultar el período antes de exportar.';
+  }
+ });
  return {start:begin,stop,isActive:()=>active};
 }
