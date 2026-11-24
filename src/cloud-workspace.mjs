@@ -22,6 +22,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  let products=[],orders=[],clients=[],inventory=[],cash=[],stops=[];
  let active=false,busy=false,selectedOrder=null,selectedProduct=null,cart=[];
  let selectedCategory='all';
+ let cashPreviewSignature=null;
  let ordersReady=false,cashReady=false,reportData=null,reportEpoch=0,lastCompleteReport=null,lastReportFilters=null;
  const pending=new Map();
  const cloudKinds={new:'createSaleOrder',editOrder:'editSaleOrder',payment:'recordSalePayment',
@@ -349,32 +350,43 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  }
  function stop(){
   stops.forEach(f=>{try{f()}catch{}});stops=[];active=false;busy=false;
-  selectedOrder=null;selectedProduct=null;pending.clear();
+  selectedOrder=null;selectedProduct=null;pending.clear();cashPreviewSignature=null;
   products=[];orders=[];clients=[];inventory=[];cash=[];ordersReady=false;cashReady=false;reportData=null;lastCompleteReport=null;reportEpoch++;cart=[];renderCart();
  }
  function parseAmount(id){
   const n=Number(v(root,id));if(!Number.isSafeInteger(n)||n<=0)throw Error('Monto inválido');
   return n;
  }
+ function cashReviewSignature(){
+  return JSON.stringify({day:v(root,'closeDay'),openingCash:v(root,'openingCash'),
+   physicalCash:v(root,'physicalCash')});
+ }
  function showCashPreview(data){
   const box=el(root,'closePreview');
   if(data.closed){
+   cashPreviewSignature=null;
    box.innerHTML='<p><strong>Esta caja ya está cerrada.</strong></p>'+
     '<p>Fecha: '+safe(dayCL(data.day))+' · Cierre registrado. No puedes volver a cerrarla.</p>';
    return;
   }
+  cashPreviewSignature=cashReviewSignature();
   const t=data.totals||{};
+  const counted=v(root,'physicalCash');
+  const countedAmount=counted===''?null:Number(counted);
+  const difference=countedAmount===null?null:countedAmount-Number(t.expectedCash);
   const values=[
    ['Saldo inicial',data.totals?.expectedCash-data.totals?.cashNet],
    ['Ingresos efectivo',t.cashIn],['Salidas efectivo',t.cashOut],
    ['Efectivo esperado',t.expectedCash],
+   ['Efectivo contado',countedAmount===null?0:countedAmount],
+   ['Diferencia',difference===null?0:difference],
    ['Entradas TEF',t.tefIn],['Salidas TEF',t.tefOut],
    ['TEF neto',t.tefNet],['Movimientos',data.movementCount]
   ];
   box.innerHTML='<p><strong>Vista previa de caja · '+safe(dayCL(data.day))+'</strong></p>'+
    '<div class="grid">'+values.map(([label,value])=>
     '<div class="line"><span>'+safe(label)+'</span><strong>'+
-    (label==='Movimientos'?safe(value):clp(value))+'</strong></div>').join('')+'</div>'+
+    (label==='Movimientos'?safe(value):((label==='Diferencia'||label==='Efectivo contado')&&countedAmount===null?'No indicado':clp(value)))+'</strong></div>').join('')+'</div>'+
    '<p><strong>Comandas pendientes de pago: '+Number(data.pendingCount||0)+'</strong>'+
    ' · Saldo pendiente '+clp(data.pendingAmount)+'</p>'+
    (data.pending?.length?'<div class="spaced"><strong>Revisa estas comandas antes de cerrar:</strong>'+
@@ -526,10 +538,13 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    message('Respaldo generado: '+Object.values(result.counts).reduce((n,x)=>n+x,0)+' registros. Guarda el archivo en un lugar privado.','success');
   }else if(action==='close'){
    permission('cash.close');
+   if(!cashPreviewSignature||cashPreviewSignature!==cashReviewSignature())
+    throw Error('Revisa la caja con los valores actuales antes de confirmar el cierre');
    const data={day:v(root,'closeDay'),openingCash:Number(v(root,'openingCash')),
     physicalCash:v(root,'physicalCash')===''?null:Number(v(root,'physicalCash')),
     pendingReviewed:el(root,'pendingReviewed').checked};
    await once('close',data,key=>sales.closeCashDay(data,key));
+   cashPreviewSignature=null;
   }
  }
  root.addEventListener('click',async event=>{
@@ -593,6 +608,11 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  root.addEventListener('input',e=>{
   if(e.target.matches('[data-cloud="search"]'))drawOrders();
   if(e.target.matches('[data-cloud="customer"]'))drawCustomerSuggestions();
+  if(e.target.matches('[data-cloud="closeDay"],[data-cloud="openingCash"],[data-cloud="physicalCash"]')){
+   cashPreviewSignature=null;
+   el(root,'closePreview').textContent='Los datos han cambiado. Pulsa Revisar caja antes de confirmar.';
+   el(root,'pendingReviewed').checked=false;
+  }
   if(e.target.matches('[data-cloud^="report"]')){
    invalidateReport();
    el(root,'reportWarning').textContent='Los filtros han cambiado. Pulsa Consultar período en Firebase para actualizar y exportar.';
