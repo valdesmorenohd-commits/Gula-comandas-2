@@ -405,6 +405,17 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   if(action==='checkPending'){
    await checkAllPending();return;
   }
+  if(action==='quickClient'){
+   permission('clients.manage');
+   const name=v(root,'customer').trim();
+   if(name.length<2||name.length>100)throw Error('Escribe un nombre de cliente válido');
+   const match=clients.find(c=>String(c.name||'').trim().toLocaleLowerCase('es-CL')===name.toLocaleLowerCase('es-CL'));
+   if(match){message('Este cliente ya existe en el catálogo.','success');return}
+   const data={name,phone:'',notes:''};
+   await once('quickClient',data,key=>master.addClient(getUser(),data,key));
+   message('Cliente guardado en el catálogo compartido.','success');
+   return;
+  }
   if(action==='addLine'){
    addCartLine();return;
   }
