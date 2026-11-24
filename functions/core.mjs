@@ -1,7 +1,7 @@
 // Núcleo transaccional aislado, apto para comprobarse en emulador sin desplegar Functions.
 import {FieldValue} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
-import {canPerform} from '../src/access-policy.mjs';
+import {canPerform} from './access-policy.mjs';
 import {orderInput,paymentInput,adjustmentInput,cancellationInput,refundInput,cashMovementInput,closingInput,summarizeCashRows,localChileDay,idempotencyKey,inventoryKey,computeTotal} from './validation.mjs';
 export function createSalesCore(db){
  const businessId='gula',base=db.collection('businesses').doc(businessId);
