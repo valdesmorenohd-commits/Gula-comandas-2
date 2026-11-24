@@ -10,6 +10,10 @@ import {downloadReportCsv} from './cloud-report-export.mjs';
 import {canPerform} from './access-policy.mjs';
 const safe=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const clp=v=>'$'+Number(v||0).toLocaleString('es-CL');
+const dayCL=value=>{
+ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));
+ return m?m[3]+'-'+m[2]+'-'+m[1]:String(value||'');
+};
 const el=(root,id)=>root.querySelector('[data-cloud="'+id+'"]');
 const v=(root,id)=>el(root,id)?.value??'';
 export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
@@ -165,6 +169,24 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   drawProductCards();drawStockHint();
   el(root,'productList').innerHTML=products.map(p=>'<div class="line"><b>'+safe(p.name)+'</b><span>'+clp(p.price)+' · '+(p.stockMode==='dated'?'Por fecha':'Permanente')+'</span></div>').join('')||'<p>Sin catálogo compartido.</p>';
  }
+ function confirmOrderSummary(data,{edit=false}={}){
+  const total=data.items.reduce((sum,line)=>{
+   const p=products.find(x=>x.id===line.productId);
+   const variation=(p?.options||[]).find(x=>x.name===line.option);
+   if(!p||!p.active)throw Error('Hay un producto que ya no está disponible');
+   return sum+line.quantity*(p.price+Number(variation?.extra||0));
+  },0);
+  const details=data.items.map(line=>{
+   const p=products.find(x=>x.id===line.productId);
+   return line.quantity+' × '+(p?.name||line.productId)+(line.option?' ('+line.option+')':'');
+  });
+  return window.confirm((edit?'¿Guardar cambios en la comanda seleccionada?':'¿Confirmar nueva comanda?')+
+   '\\nCliente: '+data.customer+'\\nEntrega: '+dayCL(data.deliveryDate)+
+   (data.deliveryWindow?' · '+data.deliveryWindow:'')+
+   '\\n\\nProductos:\\n'+details.join('\\n')+
+   '\\n\\nTotal estimado: '+clp(total)+
+   '\\nEl precio definitivo y el stock se verificarán al guardar en Firebase.');
+ }
  function renderCart(){
   const box=el(root,'cart');
   if(!box)return;
@@ -202,7 +224,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    const statusClass=o.status==='canceled'?'void':o.paymentStatus==='paid'?'paid':
     o.paymentStatus==='partial'?'partial':'pending';
    return '<article class="panel cloud-order-card cloud-order-'+statusClass+'"><div class="line"><b>'+safe(o.number||o.id)+'</b><strong>'+clp(o.total)+'</strong></div>'+
-    '<div class="muted sub">'+safe(o.customer)+' · '+safe(o.deliveryDate)+'</div>'+
+    '<div class="muted sub">'+safe(o.customer)+' · '+safe(dayCL(o.deliveryDate))+'</div>'+
     '<div class="line"><span class="cloud-payment-state cloud-payment-'+statusClass+'">'+safe(orderStatus(o))+'</span>'+
     '<strong>Saldo '+clp(o.balance)+'</strong></div>'+
     '<div class="sub">Abonado: '+clp(o.paidTotal)+'</div>'+
@@ -394,6 +416,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
     deliveryWindow:v(root,'window'),notes:v(root,'notes'),
     items:cart.map(x=>({...x}))
    };
+   if(!confirmOrderSummary(data))return;
    const result=await once('new',data,key=>sales.createOrder(data,key));
    selectedOrder=result.id;cart=[];renderCart();
    el(root,'selectedOrder').textContent=result.number+' · Guardada';
@@ -404,6 +427,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    const payload={orderId:selectedOrder,customer:v(root,'customer').trim(),
     deliveryDate:v(root,'date'),deliveryWindow:v(root,'window'),notes:v(root,'notes'),
     items:cart.map(line=>({...line}))};
+   if(!confirmOrderSummary(payload,{edit:true}))return;
    await once('editOrder',payload,key=>sales.editOrder(payload.orderId,payload,key));
    cart=[];renderCart();
   }else if(action==='payment'){
