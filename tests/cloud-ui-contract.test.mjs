@@ -140,3 +140,11 @@ test('el cierre de caja exige revisión reciente si cambian fecha o importes',()
  assert.match(workspace,/Efectivo contado/);
  assert.match(workspace,/Diferencia/);
 });
+
+test('se imprime solo una comanda de 58 mm desde Historial, sin impresión automática de cocina',()=>{
+ assert.match(html,/data-print-order/);
+ assert.match(html,/import \{demoOrderForReceipt\} from '\.\/src\/receipt-print-adapter\.mjs'/);
+ assert.match(html,/openReceiptPrint\(demoOrderForReceipt\(order\),\{widthMm:58,type:'customer'\}\)/);
+ assert.match(workspace,/data-cloud-print/);
+ assert.doesNotMatch(workspace,/data-cloud-kitchen/);
+});
