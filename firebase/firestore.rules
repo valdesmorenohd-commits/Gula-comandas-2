@@ -62,9 +62,23 @@ service cloud.firestore {
         && exists(memberPath(businessId, request.auth.uid))
         && get(memberPath(businessId, request.auth.uid)).data.active == true;
     }
-    function canCreateOrder(businessId) {
+    // Para colecciones administradas desde el navegador, las reglas deben
+    // verificar los mismos permisos individualizados que Cloud Functions.
+    function hasPermission(businessId, permission) {
       return activeMember(businessId)
-        && get(memberPath(businessId, request.auth.uid)).data.roleId in ['principal_admin','personal'];
+        && !(permission in get(memberPath(businessId, request.auth.uid)).data.denies)
+        && (
+          get(memberPath(businessId, request.auth.uid)).data.roleId == 'principal_admin'
+          || (
+            get(memberPath(businessId, request.auth.uid)).data.roleId == 'personal'
+            && permission in ['orders.read','orders.create','orders.edit','orders.close',
+                'clients.manage','inventory.adjust','payments.record','cash.manage','reports.read']
+          )
+          || permission in get(memberPath(businessId, request.auth.uid)).data.grants
+        );
+    }
+    function canCreateOrder(businessId) {
+      return hasPermission(businessId,'orders.create');
     }
     function orderFieldsValid(data,businessId) {
       return data.keys().hasOnly([
@@ -107,7 +121,7 @@ service cloud.firestore {
     // Los datos de ventas definitivas se escriben exclusivamente con
     // Cloud Functions (Admin SDK en servidor), nunca directamente desde cliente.
     match /businesses/{businessId}/orders/{orderId} {
-      allow get, list: if activeMember(businessId);
+      allow get, list: if hasPermission(businessId,'orders.read');
       allow create, update, delete: if false;
     }
     match /businesses/{businessId}/cashEntries/{movementId} {
@@ -158,12 +172,12 @@ service cloud.firestore {
     }
     match /businesses/{businessId}/products/{productId} {
       allow get, list: if activeMember(businessId);
-      allow create: if isPrincipal(businessId)
+      allow create: if hasPermission(businessId,'products.manage')
         && productValid(request.resource.data,businessId)
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isPrincipal(businessId)
+      allow update: if hasPermission(businessId,'products.manage')
         && productValid(request.resource.data,businessId)
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdBy == resource.data.createdBy
@@ -189,12 +203,12 @@ service cloud.firestore {
     }
     match /businesses/{businessId}/clients/{clientId} {
       allow get, list: if activeMember(businessId);
-      allow create: if canCreateOrder(businessId)
+      allow create: if hasPermission(businessId,'clients.manage')
         && clientValid(request.resource.data,businessId)
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && request.resource.data.createdBy == request.auth.uid;
-      allow update: if canCreateOrder(businessId)
+      allow update: if hasPermission(businessId,'clients.manage')
         && clientValid(request.resource.data,businessId)
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdBy == resource.data.createdBy
