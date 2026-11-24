@@ -131,3 +131,12 @@ test('el cierre de caja presenta un resumen legible y pendientes, no JSON técni
  assert.doesNotMatch(workspace,/closePreview'\)\.textContent=JSON\.stringify/);
  assert.match(workspace,/el\(root,'pendingReviewed'\)\.checked=false/);
 });
+
+test('el cierre de caja exige revisión reciente si cambian fecha o importes',()=>{
+ assert.match(workspace,/function cashReviewSignature/);
+ assert.match(workspace,/cashPreviewSignature!==cashReviewSignature\(\)/);
+ assert.match(workspace,/Revisa la caja con los valores actuales/);
+ assert.match(workspace,/Los datos han cambiado\. Pulsa Revisar caja/);
+ assert.match(workspace,/Efectivo contado/);
+ assert.match(workspace,/Diferencia/);
+});
