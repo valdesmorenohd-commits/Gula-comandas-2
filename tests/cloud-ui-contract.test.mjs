@@ -58,3 +58,10 @@ test('los informes históricos requieren fechas y paginación, sin presentar 200
  assert.match(workspace,/Selecciona las fechas desde y hasta/);
  assert.match(workspace,/dataset\.partialOrders\|\|dataset\.partialCash/);
 });
+
+test('informes CSV solo pueden exportarse después de consultar un período completo',()=>{
+ assert.match(html,/data-cloud-action="exportReport"/);
+ assert.match(workspace,/lastCompleteReport/);
+ assert.match(workspace,/downloadReportCsv/);
+ assert.match(workspace,/dataset\.partialOrders/);
+});
