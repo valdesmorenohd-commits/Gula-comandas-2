@@ -234,12 +234,17 @@ async function cancelSaleOrder(uid,data){
 async function checkSaleOperation(uid,data){
  const key=idempotencyKey(data?.idempotencyKey);
  const kind=String(data?.kind||'');
- const kinds=['createSaleOrder','editSaleOrder','recordSalePayment','adjustSaleInventory',
-  'cancelSaleOrder','closeSaleOrder','reopenSaleOrder','recordSaleRefund','recordCashMovement','closeCashDay'];
- if(!kinds.includes(kind))throw Error('Tipo de operación inválido');
+ const permissions={
+  createSaleOrder:'orders.create',editSaleOrder:'orders.edit',
+  recordSalePayment:'payments.record',adjustSaleInventory:'inventory.adjust',
+  cancelSaleOrder:'orders.cancel',closeSaleOrder:'orders.close',
+  reopenSaleOrder:'orders.reopen',recordSaleRefund:'refunds.record',
+  recordCashMovement:'cash.manage',closeCashDay:'cash.close'
+ };
+ if(!Object.hasOwn(permissions,kind))throw Error('Tipo de operación inválido');
  const opRef=operationRef(uid,key,kind);
  return db.runTransaction(async tx=>{
-  await memberActor(tx,uid,'orders.create');
+  await memberActor(tx,uid,permissions[kind]);
   const snap=await tx.get(opRef);
   if(!snap.exists)return {confirmed:false};
   return {confirmed:true,result:snap.data().result};
