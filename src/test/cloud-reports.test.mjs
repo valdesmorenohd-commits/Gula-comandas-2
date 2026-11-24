@@ -70,3 +70,10 @@ test('formato Firestore Timestamp se normaliza a fecha local de Chile',()=>{
  assert.equal(dayOf({seconds:1795521600}),'2026-11-24');
  assert.equal(dayOf('2026-11-24'),'2026-11-24');
 });
+
+test('fecha de creación cerca de medianoche usa Chile y no el día UTC',()=>{
+ assert.equal(dayOf('2026-11-24T01:00:00.000Z'),'2026-11-23');
+ const r=buildSharedReport({orders:[{...orders[0],createdAt:'2026-11-24T01:00:00.000Z'}],
+  cashEntries:[],from:'2026-11-23',to:'2026-11-23',dateType:'created'});
+ assert.equal(r.orderCount,1);
+});
