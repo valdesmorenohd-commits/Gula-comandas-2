@@ -8,6 +8,8 @@ export const PERMISSIONS=Object.freeze([
  ['orders.read','Consultar comandas'],
  ['orders.create','Crear comandas'],
  ['orders.edit','Editar comandas'],
+ ['orders.close','Cerrar comandas'],
+ ['orders.reopen','Reabrir comandas'],
  ['orders.cancel','Anular comandas'],
  ['payments.record','Registrar pagos'],
  ['refunds.record','Registrar devoluciones'],
@@ -24,7 +26,7 @@ export const PERMISSIONS=Object.freeze([
 const ALL=PERMISSIONS.map(([id])=>id);
 export const ROLE_DEFAULTS=Object.freeze({
  principal_admin:Object.freeze([...ALL]),
- personal:Object.freeze(['orders.read','orders.create','clients.manage','products.manage','inventory.adjust','payments.record','cash.manage','reports.read']),
+ personal:Object.freeze(['orders.read','orders.create','orders.edit','orders.close','clients.manage','inventory.adjust','payments.record','cash.manage','reports.read']),
  consulta:Object.freeze(['orders.read','reports.read'])
 });
 const RESERVED=new Set(['users.manage','settings.manage','backups.restore']);
