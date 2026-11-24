@@ -113,3 +113,11 @@ test('fecha del historial compartido se muestra en formato DD-MM-AAAA',()=>{
  assert.match(workspace,/const dayCL=value=>/);
  assert.match(workspace,/safe\(dayCL\(o\.deliveryDate\)\)/);
 });
+
+test('Nueva Comanda utiliza hora única opcional y permite alta rápida de clientes',()=>{
+ assert.match(html,/data-cloud="window" type="time"/);
+ assert.match(html,/data-cloud-action="quickClient"/);
+ assert.match(workspace,/if\(action==='quickClient'\)/);
+ assert.match(workspace,/permission\('clients.manage'\)/);
+ assert.match(workspace,/master\.addClient\(getUser\(\),data,key\)/);
+});
