@@ -340,6 +340,13 @@ body.picker-open{overflow:hidden}
 .cloud-payment-partial{background:#fff0d2;color:#794b00}
 .cloud-payment-paid{background:#e2f4e7;color:#185b36}
 .cloud-payment-void{background:#ebebeb;color:#505050}
+
+.cloud-product-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(136px,1fr));gap:9px;margin:10px 0}
+.cloud-product-card{display:flex;flex-direction:column;gap:6px;align-items:stretch;border:1px solid #cdd9ce;border-radius:12px;background:#fff;padding:9px;text-align:left;color:inherit}
+.cloud-product-card[aria-pressed="true"]{outline:3px solid #39684b}
+.cloud-product-card img{width:100%;height:95px;object-fit:cover;border-radius:8px;background:#f0f0ed}
+.cloud-product-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:95px;border-radius:8px;background:#edf1e9;color:#344e40;font-size:12px}
+.cloud-product-card small{font-size:12px;color:#415248}
 </style></head>
 <body>
 <header><div class="top"><div class="brand-head"><img id="headerLogo" alt="Logo de Gula" hidden><div><strong id="headerBrandName">GULA</strong><small>Comandas 2.0 · Pruebas</small></div></div><button id="signout" hidden>Cerrar sesión</button></div></header>
@@ -388,13 +395,18 @@ body.picker-open{overflow:hidden}
 <div class="panel"><h2>Estado</h2><p data-cloud="message" class="muted sub" role="status">Esperando acceso autorizado.</p><p data-cloud="pendingNotice" class="sub" role="alert"></p><div class="buttons"><button type="button" class="secondary" data-cloud-action="checkPending">Comprobar operaciones pendientes</button></div></div>
 <div class="panel"><h2>Nueva Comanda compartida</h2>
 <div class="grid">
-<div><label>Cliente</label><input data-cloud="customer" maxlength="100" placeholder="Nombre del cliente"></div>
+<div><label>Cliente</label><input data-cloud="customer" list="gulaCloudCustomerSuggestions" maxlength="100" autocomplete="off" placeholder="Escribe 4 letras para buscar"><datalist id="gulaCloudCustomerSuggestions"></datalist><small data-cloud="customerHint" class="muted sub">Puedes escribir un cliente nuevo.</small></div>
 <div><label>Entrega</label><input data-cloud="date" type="date"></div>
 <div><label>Horario</label><input data-cloud="window" placeholder="18:00–20:00"></div>
 <div><label>Producto</label><select data-cloud="product"></select></div>
 <div><label>Opción</label><select data-cloud="option"><option value="">Sin opción</option></select></div>
 <div><label>Cantidad</label><input data-cloud="quantity" type="number" min="1" max="99" value="1"></div>
-</div><label>Observaciones</label><textarea data-cloud="notes" rows="2"></textarea>
+</div>
+<p class="muted sub">Productos por fotografía (vista predeterminada). El listado también está disponible arriba.</p>
+<div data-cloud="categoryFilters" class="buttons" role="group" aria-label="Categorías de productos"></div>
+<div data-cloud="productCards" class="cloud-product-cards"></div>
+<p data-cloud="stockHint" class="muted sub" role="status"></p>
+<label>Observaciones</label><textarea data-cloud="notes" rows="2"></textarea>
 <div class="buttons"><button type="button" class="secondary" data-cloud-action="addLine">Agregar producto al pedido</button></div>
 <div data-cloud="cart" class="spaced"></div><p data-cloud="cartTotal" class="sub">Total estimado: $0</p>
 <div class="buttons"><button type="button" class="primary" data-cloud-action="new">Guardar comanda en Firebase</button></div>
