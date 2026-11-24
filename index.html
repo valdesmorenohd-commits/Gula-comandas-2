@@ -328,6 +328,18 @@ body.picker-open{overflow:hidden}
 #cash .cash-main-filters input[type=date]{max-width:100%;min-width:0}
 @media(max-width:700px){#cash .cash-main-filters{grid-template-columns:minmax(0,1fr)}}
 .date-format-help{display:block;margin:5px 0 0;font-size:12px;line-height:1.2}
+
+/* Estado de pago del historial compartido, legible y sin depender solo del color */
+.cloud-order-card{border-left:5px solid #a7b3ad}
+.cloud-order-pending{border-left-color:#a52d37}
+.cloud-order-partial{border-left-color:#a36c16}
+.cloud-order-paid{border-left-color:#24734a}
+.cloud-order-void{border-left-color:#777}
+.cloud-payment-state{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:750}
+.cloud-payment-pending{background:#fbe8e9;color:#86202a}
+.cloud-payment-partial{background:#fff0d2;color:#794b00}
+.cloud-payment-paid{background:#e2f4e7;color:#185b36}
+.cloud-payment-void{background:#ebebeb;color:#505050}
 </style></head>
 <body>
 <header><div class="top"><div class="brand-head"><img id="headerLogo" alt="Logo de Gula" hidden><div><strong id="headerBrandName">GULA</strong><small>Comandas 2.0 · Pruebas</small></div></div><button id="signout" hidden>Cerrar sesión</button></div></header>
