@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {before,after,beforeEach,test} from 'node:test';
 import assert from 'node:assert/strict';
 import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/rules-unit-testing';
-import {doc,collection,getDoc,getDocs,setDoc,updateDoc,serverTimestamp,deleteDoc} from 'firebase/firestore';
+import {doc,collection,getDoc,getDocs,setDoc,updateDoc,serverTimestamp,deleteDoc,query,where,orderBy,limit,startAfter} from 'firebase/firestore';
 
 const PROJECT_ID='gula-members-test';
 const BUSINESS='gula', OWNER='owner-fixture', STAFF='staff-fixture', STRANGER='stranger-fixture';
@@ -210,4 +210,40 @@ test('contadores y operaciones solo son legibles por principal; nadie escribe de
   await assertFails(setDoc(ownerRef,{value:123}));
   await assertFails(setDoc(staffRef,{value:123}));
  }
+});
+
+test('el historial compartido admite consultas por fecha de entrega con paginación',async()=>{
+ await env.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();
+  for(let i=1;i<=5;i++)await setDoc(doc(db,'businesses',BUSINESS,'orders','report-'+i),{
+   customer:'Cliente '+i,deliveryDate:i<=4?'2026-11-24':'2026-11-25',total:1000*i
+  });
+ });
+ const db=env.authenticatedContext(STAFF).firestore();
+ const orders=collection(db,'businesses',BUSINESS,'orders');
+ const first=await assertSucceeds(getDocs(query(orders,where('deliveryDate','>=','2026-11-24'),
+  where('deliveryDate','<=','2026-11-24'),orderBy('deliveryDate'),limit(2))));
+ assert.equal(first.docs.length,2);
+ const second=await assertSucceeds(getDocs(query(orders,where('deliveryDate','>=','2026-11-24'),
+  where('deliveryDate','<=','2026-11-24'),orderBy('deliveryDate'),startAfter(first.docs[1]),limit(2))));
+ assert.equal(second.docs.length,2);
+ assert.equal(new Set([...first.docs,...second.docs].map(d=>d.id)).size,4);
+ const third=await assertSucceeds(getDocs(query(orders,where('deliveryDate','>=','2026-11-24'),
+  where('deliveryDate','<=','2026-11-24'),orderBy('deliveryDate'),startAfter(second.docs[1]),limit(2))));
+ assert.equal(third.docs.length,0);
+});
+test('movimientos de caja por período solo pueden consultarse desde cuenta principal',async()=>{
+ await env.withSecurityRulesDisabled(async ctx=>{
+  await setDoc(doc(ctx.firestore(),'businesses',BUSINESS,'cashEntries','cash-period-1'),{
+   day:'2026-11-24',method:'efectivo',direction:'in',amount:1000
+  });
+ });
+ const root='businesses/'+BUSINESS+'/cashEntries';
+ const ownerDb=env.authenticatedContext(OWNER).firestore();
+ const staffDb=env.authenticatedContext(STAFF).firestore();
+ const requestPage=db=>getDocs(query(collection(db,root),where('day','>=','2026-11-24'),
+  where('day','<=','2026-11-24'),orderBy('day'),limit(200)));
+ const owner=await assertSucceeds(requestPage(ownerDb));
+ assert.equal(owner.size,1);
+ await assertFails(requestPage(staffDb));
 });
