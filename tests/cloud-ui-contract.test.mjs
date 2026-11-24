@@ -102,3 +102,14 @@ test('previsualización de stock es indicativa y toma fecha de entrega',()=>{
  assert.match(workspace,/stockMode|mode==='dated'/);
  assert.match(workspace,/La disponibilidad se confirma al guardar/);
 });
+
+test('Nueva Comanda solicita confirmar resumen antes de registrar o editar una venta',()=>{
+ assert.match(workspace,/function confirmOrderSummary/);
+ assert.match(workspace,/window\.confirm/);
+ assert.match(workspace,/if\(!confirmOrderSummary\(data\)\)return/);
+ assert.match(workspace,/if\(!confirmOrderSummary\(payload,\{edit:true\}\)\)return/);
+});
+test('fecha del historial compartido se muestra en formato DD-MM-AAAA',()=>{
+ assert.match(workspace,/const dayCL=value=>/);
+ assert.match(workspace,/safe\(dayCL\(o\.deliveryDate\)\)/);
+});
