@@ -1,23 +1,17 @@
 // Núcleo transaccional aislado, apto para comprobarse en emulador sin desplegar Functions.
 import {FieldValue} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
+import {canPerform} from '../src/access-policy.mjs';
 import {orderInput,paymentInput,adjustmentInput,cancellationInput,refundInput,cashMovementInput,closingInput,summarizeCashRows,localChileDay,idempotencyKey,inventoryKey,computeTotal} from './validation.mjs';
 export function createSalesCore(db){
  const businessId='gula',base=db.collection('businesses').doc(businessId);
  const forbidden=msg=>{throw new Error(msg)};
- const defaults={
- principal_admin:new Set(['orders.create','orders.edit','orders.close','orders.reopen','orders.cancel','payments.record','refunds.record','inventory.adjust','cash.manage','cash.close']),
- personal:new Set(['orders.create','orders.edit','orders.close','payments.record','inventory.adjust','cash.manage']),
- consulta:new Set()
-};
 async function memberActor(tx,uid,permission){
  const ref=base.collection('members').doc(uid);
  const snap=await tx.get(ref),member=snap.data();
- if(!snap.exists||member.active!==true||member.uid!==uid||member.businessId!==businessId)
+ if(!snap.exists||!member||member.active!==true||member.uid!==uid||member.businessId!==businessId)
   forbidden('No tienes acceso activo a Gula');
- const allowed=defaults[member.roleId]||new Set();
- if(Array.isArray(member.denies)&&member.denies.includes(permission))forbidden('Permiso denegado');
- if(!allowed.has(permission) && !(Array.isArray(member.grants)&&member.grants.includes(permission)))
+ if(!canPerform({authUid:uid,businessId,membership:member,permission}))
   forbidden('Tu perfil no puede realizar esta operación');
  return member;
 }
