@@ -17,6 +17,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  const master=sharedMasterData(firebaseApp);
  let products=[],orders=[],clients=[],inventory=[],cash=[],stops=[];
  let active=false,busy=false,selectedOrder=null,selectedProduct=null,cart=[];
+ let selectedCategory='all';
  let ordersReady=false,cashReady=false,reportData=null,reportEpoch=0,lastCompleteReport=null,lastReportFilters=null;
  const pending=new Map();
  const cloudKinds={new:'createSaleOrder',editOrder:'editSaleOrder',payment:'recordSalePayment',
@@ -96,6 +97,56 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   }finally{busy=false}
  }
  function orderStatus(o){return o.status==='closed'?'Cerrada':o.status==='canceled'?'Anulada':o.paymentStatus==='paid'?'Pagada':o.paymentStatus==='partial'?'Abonada':'Pendiente'}
+ function drawCustomerSuggestions(){
+  const search=v(root,'customer').trim().toLocaleLowerCase('es-CL');
+  const list=root.querySelector('#gulaCloudCustomerSuggestions');
+  if(!list)return;
+  list.replaceChildren();
+  if(search.length<4){
+   el(root,'customerHint').textContent='Escribe al menos 4 letras para buscar clientes; también puedes ingresar uno nuevo.';
+   return;
+  }
+  const matches=clients.filter(x=>String(x.name||'').toLocaleLowerCase('es-CL').includes(search)).slice(0,8);
+  for(const client of matches){
+   const option=document.createElement('option');
+   option.value=client.name;list.appendChild(option);
+  }
+  el(root,'customerHint').textContent=matches.length?
+   matches.length+' cliente(s) encontrado(s). Selecciona uno o escribe un nombre diferente.':
+   'No hay coincidencias. Puedes crear la comanda con este nombre.';
+ }
+ function stockSummary(productId,date,mode){
+  if(mode==='dated'&&!date)return 'Selecciona la fecha de entrega para consultar existencias.';
+  const id=productId+'__'+(mode==='dated'?date:'permanent');
+  const record=inventory.find(i=>i.id===id);
+  if(!record)return 'Stock no configurado para este producto'+(mode==='dated'?' en la fecha seleccionada':'')+'.';
+  const qty=Number(record.quantity);
+  if(!Number.isSafeInteger(qty)||qty<0)return 'Stock no válido: verifica existencias.';
+  const requested=cart.filter(c=>c.productId===productId).reduce((n,c)=>n+c.quantity,0);
+  return 'Existencias: '+qty+'. En el carrito: '+requested+
+   '. Restarían aproximadamente '+(qty-requested)+'. La disponibilidad se confirma al guardar.';
+ }
+ function drawStockHint(){
+  const product=products.find(p=>p.id===v(root,'product'));
+  el(root,'stockHint').textContent=product?
+   stockSummary(product.id,v(root,'date'),product.stockMode):
+   'Selecciona un producto para consultar sus existencias.';
+ }
+ function drawProductCards(){
+  const categories=[...new Set(products.filter(p=>p.active).map(p=>p.category||'Sin categoría'))];
+  if(selectedCategory!=='all'&&!categories.includes(selectedCategory))selectedCategory='all';
+  const filters=el(root,'categoryFilters');
+  filters.innerHTML=[{label:'Todos',value:'all'},...categories.map(c=>({label:c,value:c}))].map(c=>
+   '<button type="button" class="secondary" data-cloud-category="'+safe(c.value)+'" aria-pressed="'+(selectedCategory===c.value)+'">'+safe(c.label)+'</button>').join('');
+  const list=products.filter(p=>p.active&&(selectedCategory==='all'||(p.category||'Sin categoría')===selectedCategory));
+  el(root,'productCards').innerHTML=list.map(p=>{
+   const photo=typeof p.photoUrl==='string'&&/^https:\/\//.test(p.photoUrl)?
+     '<img src="'+safe(p.photoUrl)+'" alt="'+safe(p.name)+'" loading="lazy">':
+     '<div class="cloud-product-placeholder">Sin fotografía</div>';
+   return '<button type="button" class="cloud-product-card" data-cloud-pick-product="'+safe(p.id)+'" aria-pressed="'+(v(root,'product')===p.id)+'">'+
+    photo+'<strong>'+safe(p.name)+'</strong><small>'+clp(p.price)+'</small></button>';
+  }).join('')||'<p class="muted sub">No hay productos activos en esta categoría.</p>';
+ }
  function drawProducts(){
   const option=el(root,'product');
   const choice=v(root,'product'),start=option?.value;
@@ -111,6 +162,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    products.map(p=>'<option value="'+safe(p.id)+'">'+safe(p.name)+'</option>').join('');
   if(products.some(p=>p.id===previousProduct))editProduct.value=previousProduct;
   el(root,'productCount').textContent=products.length+' productos compartidos';
+  drawProductCards();drawStockHint();
   el(root,'productList').innerHTML=products.map(p=>'<div class="line"><b>'+safe(p.name)+'</b><span>'+clp(p.price)+' · '+(p.stockMode==='dated'?'Por fecha':'Permanente')+'</span></div>').join('')||'<p>Sin catálogo compartido.</p>';
  }
  function renderCart(){
@@ -127,6 +179,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
      (line.option?' · '+safe(line.option):'')+'</span><button class="secondary" type="button" data-cloud-remove="'+i+'">Quitar</button></div>';
   }).join('')||'<p class="muted sub">Agrega productos al pedido.</p>';
   el(root,'cartTotal').textContent='Total estimado: '+clp(sum)+' (se confirmará en el servidor)';
+  drawStockHint();
  }
  function addCartLine(){
   const productId=v(root,'product'),quantity=parseAmount('quantity'),option=v(root,'option');
@@ -254,6 +307,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   const c=v(root,'clientEdit');
   el(root,'clientEdit').innerHTML='<option value="">Nuevo cliente</option>'+clients.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
   if(clients.some(x=>x.id===c))el(root,'clientEdit').value=c;
+  drawCustomerSuggestions();
   el(root,'clientCount').textContent=clients.length+' clientes compartidos';
  }
  function begin(){
@@ -265,7 +319,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    master.watchProducts(rows=>{products=rows;drawProducts();drawInventory();renderCart()},onError),
    master.watchClients(rows=>{clients=rows;drawClients()},onError),
    sales.watchOrders(rows=>{orders=rows;ordersReady=true;invalidateReport({data:true});drawOrders();drawCloudReport();message('Datos compartidos actualizados; vuelve a consultar el informe si necesitas exportarlo.','success')},onError),
-   sales.watchInventory(rows=>{inventory=rows;drawInventory()},onError)
+   sales.watchInventory(rows=>{inventory=rows;drawInventory();drawStockHint()},onError)
   ];
   if(getAccess()?.membership?.roleId==='principal_admin'){
    stops.push(sales.watchCash(rows=>{cash=rows;cashReady=true;invalidateReport({data:true});drawInventory();drawCloudReport()},onError));
@@ -418,6 +472,13 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  }
  root.addEventListener('click',async event=>{
   const order=event.target.closest('[data-cloud-order]');
+  const category=event.target.closest('[data-cloud-category]');
+  if(category){selectedCategory=category.dataset.cloudCategory;drawProductCards();return}
+  const picked=event.target.closest('[data-cloud-pick-product]');
+  if(picked){
+   el(root,'product').value=picked.dataset.cloudPickProduct;
+   drawProducts();return;
+  }
   const remove=event.target.closest('[data-cloud-remove]');
   if(remove){
    cart.splice(Number(remove.dataset.cloudRemove),1);renderCart();return;
@@ -452,6 +513,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  });
  root.addEventListener('change',e=>{
   if(e.target.matches('[data-cloud="product"]'))drawProducts();
+  if(e.target.matches('[data-cloud="date"]'))drawStockHint();
   if(e.target.matches('[data-cloud="productEdit"]')){
    const p=products.find(x=>x.id===e.target.value);
    if(!p)return;
@@ -468,6 +530,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  });
  root.addEventListener('input',e=>{
   if(e.target.matches('[data-cloud="search"]'))drawOrders();
+  if(e.target.matches('[data-cloud="customer"]'))drawCustomerSuggestions();
   if(e.target.matches('[data-cloud^="report"]')){
    invalidateReport();
    el(root,'reportWarning').textContent='Los filtros han cambiado. Pulsa Consultar período en Firebase para actualizar y exportar.';
