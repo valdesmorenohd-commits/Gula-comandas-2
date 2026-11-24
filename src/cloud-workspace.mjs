@@ -5,6 +5,7 @@ import {sharedMasterData} from './cloud-master-data.mjs';
 import {openReceiptPrint} from './cloud-receipts.mjs';
 import {downloadSharedBackup} from './cloud-backup.mjs';
 import {buildSharedReport} from './cloud-reports.mjs';
+import {loadSharedReportPeriod} from './cloud-report-loader.mjs';
 const safe=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const clp=v=>'$'+Number(v||0).toLocaleString('es-CL');
 const el=(root,id)=>root.querySelector('[data-cloud="'+id+'"]');
@@ -14,7 +15,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  const master=sharedMasterData(firebaseApp);
  let products=[],orders=[],clients=[],inventory=[],cash=[],stops=[];
  let active=false,busy=false,selectedOrder=null,selectedProduct=null,cart=[];
- let ordersReady=false,cashReady=false;
+ let ordersReady=false,cashReady=false,reportData=null,reportEpoch=0;
  const pending=new Map();
  const cloudKinds={new:'createSaleOrder',editOrder:'editSaleOrder',payment:'recordSalePayment',
   adjust:'adjustSaleInventory',cancel:'cancelSaleOrder',closeOrder:'closeSaleOrder',
@@ -184,10 +185,14 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    summary.replaceChildren();detail.replaceChildren();return;
   }
   try{
-   const r=buildSharedReport({orders,cashEntries:admin?cash:[],
-    from:v(root,'reportFrom'),to:v(root,'reportTo'),
-    dateType:v(root,'reportDateType'),customer:v(root,'reportCustomer'),
-    status:v(root,'reportStatus')});
+   const from=v(root,'reportFrom'),to=v(root,'reportTo'),dateType=v(root,'reportDateType');
+   const loaded=reportData&&reportData.from===from&&reportData.to===to&&reportData.dateType===dateType;
+   const dataset=loaded?reportData:null;
+   const r=buildSharedReport({orders:dataset?.orders||orders,
+    cashEntries:admin?(dataset?.cashEntries||cash):[],
+    from,to,dateType,customer:v(root,'reportCustomer'),
+    status:v(root,'reportStatus'),
+    orderLimit:loaded?5001:200,cashLimit:loaded?5001:200});
    const labels=[
     ['Comandas activas',r.activeCount],['Anuladas',r.canceled],
     ['Venta según fecha de comanda',clp(r.sales)],
@@ -207,11 +212,14 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
      r.products.slice(0,30).map(p=>'<tr><td>'+safe(p.name)+'</td><td>'+p.units+'</td><td>'+clp(p.total)+'</td></tr>').join('')+
      '</tbody></table></div>':'<p class="muted sub">No hay productos vendidos en esta selección.</p>');
    const issues=[];
-   if(r.partialOrders)issues.push('El historial cargado está limitado a las 200 comandas más recientes');
-   if(admin&&r.partialCash)issues.push('Los movimientos cargados están limitados a los 200 más recientes');
+   if(!loaded){
+    issues.push('Vista rápida de solo las 200 comandas más recientes; selecciona fechas y pulsa Actualizar informe para consultar el período');
+   }else if(dataset.partialOrders||dataset.partialCash){
+    issues.push('El período supera el límite de 5.000 registros por colección; utiliza un rango menor');
+   }
    if(!admin)issues.push('El detalle de movimientos de caja solo está disponible para administración');
    warning.textContent=issues.length?'Vista parcial: '+issues.join('; ')+'. No utilizar como cierre contable definitivo.':
-    'Resumen de los registros compartidos cargados. La fecha de cobro se calcula por movimientos de caja.';
+    'Consulta del período completada. Los cobros se atribuyen al día de su movimiento, no al día de entrega.';
   }catch(e){
    warning.textContent='No se pudo calcular el informe: '+(e?.message||e);
    summary.replaceChildren();detail.replaceChildren();
@@ -226,7 +234,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  function begin(){
   if(active)return;
   try{access()}catch{return}
-  active=true;ordersReady=false;cashReady=false;loadPending();pendingNotice();drawCloudReport();message('Conectando datos compartidos…');
+  active=true;ordersReady=false;cashReady=false;reportData=null;reportEpoch++;loadPending();pendingNotice();drawCloudReport();message('Conectando datos compartidos…');
   const onError=e=>message('No fue posible leer Firebase: '+(e?.code||e?.message||e),'error');
   stops=[
    master.watchProducts(rows=>{products=rows;drawProducts();drawInventory();renderCart()},onError),
@@ -241,7 +249,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
  function stop(){
   stops.forEach(f=>{try{f()}catch{}});stops=[];active=false;busy=false;
   selectedOrder=null;selectedProduct=null;pending.clear();
-  products=[];orders=[];clients=[];inventory=[];cash=[];ordersReady=false;cashReady=false;cart=[];renderCart();
+  products=[];orders=[];clients=[];inventory=[];cash=[];ordersReady=false;cashReady=false;reportData=null;reportEpoch++;cart=[];renderCart();
  }
  function parseAmount(id){
   const n=Number(v(root,id));if(!Number.isSafeInteger(n)||n<=0)throw Error('Monto inválido');
@@ -273,7 +281,18 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   if(!active)throw Error('El módulo compartido aún no está conectado');
   const u=permission(action!=='print');
   if(action==='report'){
-   drawCloudReport();return;
+   const from=v(root,'reportFrom'),to=v(root,'reportTo'),dateType=v(root,'reportDateType');
+   if(!from||!to)throw Error('Selecciona las fechas desde y hasta para consultar el período');
+   const epoch=reportEpoch;
+   message('Consultando el período por páginas en Firebase…');
+   const data=await loadSharedReportPeriod(firebaseApp,{from,to,dateType,
+    principal:getAccess()?.membership?.roleId==='principal_admin'});
+   if(epoch!==reportEpoch||!active)return;
+   reportData=data;
+   drawCloudReport();
+   message('Período consultado: '+data.orders.length+' comandas'+
+    (getAccess()?.membership?.roleId==='principal_admin'?' y '+data.cashEntries.length+' movimientos de caja':'')+'.','success');
+   return;
   }
   if(action==='checkPending'){
    await checkAllPending();return;
