@@ -230,8 +230,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
     '<strong>Saldo '+clp(o.balance)+'</strong></div>'+
     '<div class="sub">Abonado: '+clp(o.paidTotal)+'</div>'+
     '<div class="buttons"><button class="secondary" type="button" data-cloud-order="'+safe(o.id)+'">Gestionar</button>'+
-    '<button class="secondary" type="button" data-cloud-print="'+safe(o.id)+'">Imprimir cliente</button>'+
-    '<button class="secondary" type="button" data-cloud-kitchen="'+safe(o.id)+'">Cocina</button></div></article>'
+    '<button class="secondary" type="button" data-cloud-print="'+safe(o.id)+'">Imprimir comanda 58 mm</button></div></article>'
   }).join('')||'<p class="muted">Sin comandas compartidas.</p>';
   if(selectedOrder){
    const order=orders.find(o=>o.id===selectedOrder);
@@ -560,7 +559,7 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   if(remove){
    cart.splice(Number(remove.dataset.cloudRemove),1);renderCart();return;
   }
-  const print=event.target.closest('[data-cloud-print],[data-cloud-kitchen]');
+  const print=event.target.closest('[data-cloud-print]');
   if(order){
    selectedOrder=order.dataset.cloudOrder;
    const data=orders.find(o=>o.id===selectedOrder);
@@ -575,9 +574,9 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    drawOrders();return;
   }
   if(print){
-   const o=orders.find(o=>o.id===(print.dataset.cloudPrint||print.dataset.cloudKitchen));
+   const o=orders.find(o=>o.id===print.dataset.cloudPrint);
    if(!o)return;
-   try{openReceiptPrint(o,{type:print.dataset.cloudKitchen?'kitchen':'customer',widthMm:58})}
+   try{openReceiptPrint(o,{type:'customer',widthMm:58})}
    catch(e){message(e.message,'error')}
    return;
   }
