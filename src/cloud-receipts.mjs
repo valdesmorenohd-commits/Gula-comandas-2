@@ -6,7 +6,7 @@ const escapeHtml=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({
 const clp=(n)=>'$'+Number(n||0).toLocaleString('es-CL',{maximumFractionDigits:0});
 const safeInt=(v)=>Number.isSafeInteger(Number(v))&&Number(v)>=0?Number(v):0;
 const status=(key)=>({'pending':'Pendiente','partial':'Abonado','paid':'Pagado'}[key]||'Pendiente');
-const dateCL=(v)=>String(v||'').replace(/^(\\d{4})-(\\d{2})-(\\d{2})$/,'$3-$2-$1');
+const dateCL=(v)=>String(v||'').replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$3-$2-$1');
 export function receiptHtml(order,{type='customer',brand='GULA',widthMm=58}={}){
  if(type!=='customer'&&type!=='kitchen')throw Error('Tipo de comanda inválido');
  if(widthMm!==58&&widthMm!==80)throw Error('El papel debe ser de 58 u 80 mm');
