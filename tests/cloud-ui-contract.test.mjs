@@ -51,3 +51,10 @@ test('puede consultar pagos pendientes sin enviar un nuevo cargo',()=>{
  assert.match(workspace,/sales\.checkOperation\(cloudKinds\[kind\],row\.key\)/);
  assert.match(workspace,/pending\.delete\(kind\)/);
 });
+
+test('los informes históricos requieren fechas y paginación, sin presentar 200 filas como total',()=>{
+ assert.match(workspace,/loadSharedReportPeriod/);
+ assert.match(workspace,/Vista rápida de solo las 200 comandas/);
+ assert.match(workspace,/Selecciona las fechas desde y hasta/);
+ assert.match(workspace,/dataset\.partialOrders\|\|dataset\.partialCash/);
+});
