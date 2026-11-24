@@ -121,3 +121,13 @@ test('Nueva Comanda utiliza hora única opcional y permite alta rápida de clien
  assert.match(workspace,/permission\('clients.manage'\)/);
  assert.match(workspace,/master\.addClient\(getUser\(\),data,key\)/);
 });
+
+test('el cierre de caja presenta un resumen legible y pendientes, no JSON técnico',()=>{
+ assert.match(html,/data-cloud="closePreview"/);
+ assert.match(workspace,/function showCashPreview/);
+ assert.match(workspace,/Comandas pendientes de pago/);
+ assert.match(workspace,/Efectivo esperado/);
+ assert.match(workspace,/TEF neto/);
+ assert.doesNotMatch(workspace,/closePreview'\)\.textContent=JSON\.stringify/);
+ assert.match(workspace,/el\(root,'pendingReviewed'\)\.checked=false/);
+});
