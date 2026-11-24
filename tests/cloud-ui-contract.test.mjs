@@ -65,3 +65,10 @@ test('informes CSV solo pueden exportarse después de consultar un período comp
  assert.match(workspace,/downloadReportCsv/);
  assert.match(workspace,/dataset\.partialOrders/);
 });
+
+test('no permite exportar un informe si han cambiado sus filtros o llegaron datos nuevos',()=>{
+ assert.match(workspace,/lastReportFilters!==JSON\.stringify\(reportFilters\(\)\)/);
+ assert.match(workspace,/invalidateReport\(\{data:true\}\)/);
+ assert.match(workspace,/if\(e\.target\.matches\('\[data-cloud\^="report"\]'\)\)/);
+ assert.match(workspace,/reportEpoch\+\+/);
+});
