@@ -2,8 +2,11 @@
 // No mezcla ventas por fecha de pedido/entrega con dinero cobrado en otra fecha.
 export function dayOf(value){
  if(typeof value==='string'){
-  const found=value.match(/^\d{4}-\d{2}-\d{2}/);
-  return found?found[0]:'';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(value))return value;
+  // Los instantes ISO se convierten a día local chileno: cerca de medianoche
+  // el día UTC puede ser distinto al día en que se creó el pedido en Chile.
+  const parsed=new Date(value);
+  return Number.isNaN(parsed.getTime())?'':dayOf(parsed);
  }
  if(value&&typeof value.toDate==='function')return dayOf(value.toDate());
  if(value instanceof Date){
