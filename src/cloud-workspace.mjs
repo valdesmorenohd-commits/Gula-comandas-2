@@ -356,6 +356,31 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   const n=Number(v(root,id));if(!Number.isSafeInteger(n)||n<=0)throw Error('Monto inválido');
   return n;
  }
+ function showCashPreview(data){
+  const box=el(root,'closePreview');
+  if(data.closed){
+   box.innerHTML='<p><strong>Esta caja ya está cerrada.</strong></p>'+
+    '<p>Fecha: '+safe(dayCL(data.day))+' · Cierre registrado. No puedes volver a cerrarla.</p>';
+   return;
+  }
+  const t=data.totals||{};
+  const values=[
+   ['Saldo inicial',data.totals?.expectedCash-data.totals?.cashNet],
+   ['Ingresos efectivo',t.cashIn],['Salidas efectivo',t.cashOut],
+   ['Efectivo esperado',t.expectedCash],
+   ['Entradas TEF',t.tefIn],['Salidas TEF',t.tefOut],
+   ['TEF neto',t.tefNet],['Movimientos',data.movementCount]
+  ];
+  box.innerHTML='<p><strong>Vista previa de caja · '+safe(dayCL(data.day))+'</strong></p>'+
+   '<div class="grid">'+values.map(([label,value])=>
+    '<div class="line"><span>'+safe(label)+'</span><strong>'+
+    (label==='Movimientos'?safe(value):clp(value))+'</strong></div>').join('')+'</div>'+
+   '<p><strong>Comandas pendientes de pago: '+Number(data.pendingCount||0)+'</strong>'+
+   ' · Saldo pendiente '+clp(data.pendingAmount)+'</p>'+
+   (data.pending?.length?'<div class="spaced"><strong>Revisa estas comandas antes de cerrar:</strong>'+
+    data.pending.map(o=>'<div class="line"><span>'+safe(o.number||o.id)+' · '+safe(o.customer)+'</span><b>'+clp(o.balance)+'</b></div>').join('')+'</div>':
+    '<p class="muted sub">No hay comandas pendientes de pago para esta fecha de entrega.</p>');
+ }
  async function checkAllPending(){
   if(busy)throw Error('Otra operación está en curso');
   const relevant=[...pending.entries()].filter(([kind])=>cloudKinds[kind]);
@@ -490,9 +515,11 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
    const id=v(root,'clientEdit'),data={name:v(root,'clientName'),phone:v(root,'clientPhone'),notes:v(root,'clientNotes')};
    await once('client',{id,...data},key=>id?master.editClient(getUser(),id,data):master.addClient(getUser(),data,key));
   }else if(action==='preview'){
+   permission('cash.close');
    const result=await sales.previewCashDay(v(root,'closeDay'),Number(v(root,'openingCash')));
-   el(root,'closePreview').textContent=JSON.stringify(result,null,2);
-   message('Previsualización de caja disponible.');
+   showCashPreview(result);
+   el(root,'pendingReviewed').checked=false;
+   message('Previsualización de caja disponible. Revisa los pendientes antes de cerrar.');
   }else if(action==='backup'){
    permission('users.manage');
    const result=await downloadSharedBackup(firebaseApp,{uid:u.uid,principal:true});
