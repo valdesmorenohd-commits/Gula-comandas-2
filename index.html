@@ -444,6 +444,20 @@ body.picker-open{overflow:hidden}
 <pre data-cloud="closePreview" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
 <label><input data-cloud="pendingReviewed" type="checkbox"> Revisé las comandas pendientes</label>
 <div class="buttons"><button class="secondary" type="button" data-cloud-action="close">Confirmar cierre</button></div></details></div>
+<div class="panel"><h2>Informes compartidos</h2>
+<p class="muted sub">Ventas según fecha de pedido o entrega; movimientos de caja según la fecha en que se cobraron o pagaron. No son el mismo importe.</p>
+<div class="grid">
+<div><label>Desde</label><input data-cloud="reportFrom" type="date"></div>
+<div><label>Hasta</label><input data-cloud="reportTo" type="date"></div>
+<div><label>Fecha de las comandas</label><select data-cloud="reportDateType"><option value="delivery">Fecha de entrega</option><option value="created">Fecha del pedido</option></select></div>
+<div><label>Cliente</label><input data-cloud="reportCustomer" placeholder="Todos"></div>
+<div><label>Estado</label><select data-cloud="reportStatus"><option value="all">Todos</option><option value="open">Abiertas</option><option value="closed">Cerradas</option><option value="canceled">Anuladas</option><option value="pending">Pendientes</option><option value="partial">Abonadas</option><option value="paid">Pagadas</option></select></div>
+</div>
+<div class="buttons"><button class="secondary" type="button" data-cloud-action="report">Actualizar informe</button></div>
+<p data-cloud="reportWarning" class="muted sub" role="status"></p>
+<div data-cloud="reportSummary"></div>
+<div data-cloud="reportProducts" class="spaced"></div>
+</div>
 <div class="panel"><h2>Respaldo de Firebase</h2><p class="muted sub">Solo administración. Descarga los registros compartidos en un archivo JSON privado. No incluye contraseñas ni reemplaza el respaldo automático pendiente.</p>
 <div class="buttons"><button type="button" class="secondary" data-cloud-action="backup">Exportar datos de Firebase</button></div></div>
 </div></section>
