@@ -72,3 +72,12 @@ test('no permite exportar un informe si han cambiado sus filtros o llegaron dato
  assert.match(workspace,/if\(e\.target\.matches\('\[data-cloud\^="report"\]'\)\)/);
  assert.match(workspace,/reportEpoch\+\+/);
 });
+
+test('historial compartido muestra estado pagado, parcial y pendiente junto al saldo',()=>{
+ assert.match(workspace,/cloud-payment-state cloud-payment-/);
+ assert.match(workspace,/cloud-order-card cloud-order-/);
+ assert.match(workspace,/Saldo '\+clp\(o\.balance\)/);
+ assert.match(html,/\.cloud-payment-pending\{/);
+ assert.match(html,/\.cloud-payment-partial\{/);
+ assert.match(html,/\.cloud-payment-paid\{/);
+});
