@@ -29,6 +29,7 @@ jobs:
           node --check src/cloud-receipts.mjs
           node --check src/cloud-reports.mjs
           node --check src/cloud-report-loader.mjs
+          node --check src/cloud-report-export.mjs
           node --check functions/index.mjs
           node --check functions/core.mjs
       - name: Comprobar sintaxis de JS integrado en index
