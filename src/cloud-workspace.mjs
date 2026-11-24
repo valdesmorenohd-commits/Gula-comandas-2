@@ -242,11 +242,11 @@ export function attachCloudWorkspace(root,firebaseApp,getUser,getAccess){
   stops=[
    master.watchProducts(rows=>{products=rows;drawProducts();drawInventory();renderCart()},onError),
    master.watchClients(rows=>{clients=rows;drawClients()},onError),
-   sales.watchOrders(rows=>{orders=rows;ordersReady=true;drawOrders();drawCloudReport();message('Datos compartidos actualizados.','success')},onError),
+   sales.watchOrders(rows=>{orders=rows;ordersReady=true;reportData=null;lastCompleteReport=null;drawOrders();drawCloudReport();message('Datos compartidos actualizados; vuelve a consultar el informe si necesitas exportarlo.','success')},onError),
    sales.watchInventory(rows=>{inventory=rows;drawInventory()},onError)
   ];
   if(getAccess()?.membership?.roleId==='principal_admin'){
-   stops.push(sales.watchCash(rows=>{cash=rows;cashReady=true;drawInventory();drawCloudReport()},onError));
+   stops.push(sales.watchCash(rows=>{cash=rows;cashReady=true;reportData=null;lastCompleteReport=null;drawInventory();drawCloudReport()},onError));
   }
  }
  function stop(){
